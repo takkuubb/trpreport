@@ -267,7 +267,7 @@ db.getDb();
 
 // Seed initial CSV if available
 try {
-  const csvPath = '/home/work/.openclaw/workspace/upload/trpreport-2026-05.csv';
+  const csvPath = path.join(__dirname, '..', 'trpreport-2026-05.csv');
   const months = db.getAvailableMonths();
   if (months.length === 0 && fs.existsSync(csvPath)) {
     const content = fs.readFileSync(csvPath, 'utf-8');
