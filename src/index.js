@@ -215,13 +215,13 @@ function generateTemplateReport(type, data, listing, ym) {
   const convRate = (data.contact_rate * data.booking_rate / 100).toFixed(2);
   switch (type) {
     case 'summary':
-      return `【${ym} 月次報告 - ${name}】\n\n${ym}の月間予約額は¥${Number(data.revenue).toLocaleString()}（前年比${data.revenue_yoy||'-'}）、稼働泊数は${data.booked_nights}泊（前年比${data.booked_nights_yoy||'-'}）となりました。ADR（客室単価）は¥${Number(data.adr).toLocaleString()}で${data.adr_yoy?'前年比'+data.adr_yoy:''}の水準です。\n\n予約件数${data.reservations}件、全体成約率${convRate}%の状況を踏まえ、運営側では引き続き稼働率向上に向けた施策を進めてまいります。`;
+      return `月間予約額¥${Number(data.revenue).toLocaleString()}（前年比${data.revenue_yoy||'-'}）、稼働${data.booked_nights}泊（${data.booked_nights_yoy||'-'}）。ADR¥${Number(data.adr).toLocaleString()}${data.adr_yoy?'(前年比'+data.adr_yoy+')':''}\n予約${data.reservations}件、成約率${convRate}%。運営側で稼働率向上の施策を進める。`;
     case 'funnel':
-      return `【ファネル分析 - ${name}】\n\n閲覧→連絡率: ${data.contact_rate}%（前年比${data.contact_rate_yoy||'-'}）\n連絡→予約率: ${data.booking_rate}%（前年比${data.booking_rate_yoy||'-'}）\n全体成約率: ${convRate}%\n\nリスティングページへの関心を予約に繋げるため、写真の更新や説明文の最適化を運営側で検討してまいります。`;
+      return `連絡率${data.contact_rate}%（${data.contact_rate_yoy||'-'}）、予約率${data.booking_rate}%（${data.booking_rate_yoy||'-'}）、全体成約率${convRate}%。\n写真更新や説明文の最適化を運営側で検討する。`;
     case 'pricing':
-      return `【価格戦略分析 - ${name}】\n\nADR: ¥${Number(data.adr).toLocaleString()}（前年比${data.adr_yoy||'-'}）\n平均リードタイム: ${data.avg_lead_time}日（前年比${data.avg_lead_time_yoy||'-'}）\n\n予約単価と予約タイミングのバランスを考慮し、最適な料金戦略を運営側で検討を進めます。`;
+      return `ADR¥${Number(data.adr).toLocaleString()}（${data.adr_yoy||'-'}）、リードタイム${data.avg_lead_time}日（${data.avg_lead_time_yoy||'-'}）。\n予約単価とタイミングのバランスを考慮した料金戦略を運営側で検討する。`;
     case 'trend':
-      return `【トレンド分析 - ${name}】\n\n予約数: ${data.reservations}件（前年比${data.reservations_yoy||'-'}）\n予約額: ¥${Number(data.revenue).toLocaleString()}（前年比${data.revenue_yoy||'-'}）\n稼働泊数: ${data.booked_nights}泊（前年比${data.booked_nights_yoy||'-'}）\n\n前年比の推移を踏まえ、改善施策を運営側で継続して対応してまいります。`;
+      return `予約${data.reservations}件（${data.reservations_yoy||'-'}）、予約額¥${Number(data.revenue).toLocaleString()}（${data.revenue_yoy||'-'}）、稼働${data.booked_nights}泊（${data.booked_nights_yoy||'-'}）。\n前年比を踏まえた改善施策を運営側で進める。`;
     default: return 'レポート生成中...';
   }
 }
