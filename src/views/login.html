@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>民泊AI分析レポート - ログイン</title>
+<title>Airbnb 分析レポート - ログイン</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<style>body{font-family:'Hiragino Sans','Noto Sans JP',system-ui,sans-serif;background:linear-gradient(135deg,#1e3a5f 0%,#2c5282 50%,#1a365d 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}input{min-height:48px;font-size:16px}button{min-height:48px}</style>
+<style>body{font-family:'Hiragino Sans','Noto Sans JP',system-ui,sans-serif;background:#f7f7f7;min-height:100vh;display:flex;align-items:center;justify-content:center}input{min-height:48px;font-size:16px}button{min-height:48px}</style>
 </head>
 <body>
 <div class="w-full max-w-md mx-4">
   <div class="bg-white rounded-2xl shadow-2xl p-8">
     <div class="text-center mb-6">
-      <div class="w-16 h-16 bg-gradient-to-br from-blue-900 to-blue-700 rounded-2xl flex items-center justify-center mx-auto mb-3"><i class="fas fa-chart-line text-orange-400 text-2xl"></i></div>
-      <h1 class="text-xl font-bold text-gray-800">民泊AI分析レポート</h1>
-      <p class="text-sm text-gray-500 mt-1">TRP Report</p>
+      <div class="w-16 h-16 bg-gradient-to-br from-pink-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-3"><i class="fas fab fa-airbnb text-white text-3xl"></i></div>
+      <h1 class="text-xl font-bold text-gray-800">Airbnb 分析レポート</h1>
+      <p class="text-sm text-gray-500 mt-1">Analysis Report</p>
     </div>
     <div id="loginForm">
-      <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">ユーザー名</label><input type="text" id="username" class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="ユーザー名" autocomplete="username"></div>
-      <div class="mb-6"><label class="block text-sm font-medium text-gray-700 mb-1">パスワード</label><input type="password" id="password" class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••" autocomplete="current-password"></div>
-      <button onclick="loginPw()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-lg py-3 transition mb-3"><i class="fas fa-sign-in-alt mr-2"></i>ログイン</button>
+      <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">ユーザー名</label><input type="text" id="username" class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-gray-800 focus:border-gray-800" placeholder="ユーザー名" autocomplete="username"></div>
+      <div class="mb-6"><label class="block text-sm font-medium text-gray-700 mb-1">パスワード</label><input type="password" id="password" class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-gray-800 focus:border-gray-800" placeholder="••••••••" autocomplete="current-password"></div>
+      <button onclick="loginPw()" class="w-full bg-gray-900 hover:bg-black text-white font-bold rounded-lg py-3 transition mb-3"><i class="fas fa-sign-in-alt mr-2"></i>ログイン</button>
       <div class="relative my-4"><div class="absolute inset-0 flex items-center"><div class="w-full border-t"></div></div><div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-gray-500">または</span></div></div>
       <button onclick="loginPk()" id="pkBtn" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-lg py-3 transition flex items-center justify-center gap-2"><i class="fas fa-fingerprint text-lg"></i>パスキーでログイン</button>
     </div>

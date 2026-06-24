@@ -3,57 +3,63 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>民泊AI分析レポート</title>
+<title>Airbnb 分析レポート</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--navy:#1e3a5f;--accent:#e67e22;--accent2:#f39c12}
-body{font-family:'Hiragino Sans','Noto Sans JP',system-ui,sans-serif;background:#f0f2f5;margin:0}
-.btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;font-weight:600;transition:all .15s;cursor:pointer;padding:0 16px;font-size:14px}
-.btn-p{background:var(--navy);color:#fff}.btn-p:hover{background:#163050}
-.btn-a{background:var(--accent);color:#fff}.btn-a:hover{background:#cf6b17}
-.btn-d{background:#dc2626;color:#fff}.btn-d:hover{background:#b91c1c}
-.btn-o{border:2px solid #d1d5db;color:#374151;background:#fff}.btn-o:hover{background:#f3f4f6}
-.btn-sm{min-height:36px;font-size:12px;padding:0 12px;border-radius:8px}
-.card{background:#fff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:20px;margin-bottom:16px}
-.kpi-card{background:#fff;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:16px;text-align:center}
-.kpi-val{font-size:24px;font-weight:800;color:var(--navy)}
-.kpi-label{font-size:11px;color:#6b7280;margin-top:2px}
-.kpi-yoy{font-size:12px;font-weight:600;margin-top:4px}
-.yoy-up{color:#059669}.yoy-down{color:#dc2626}.yoy-flat{color:#6b7280}
-.inp{width:100%;min-height:44px;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-size:15px;transition:border .15s}
-.inp:focus{border-color:var(--navy);outline:none;box-shadow:0 0 0 3px rgba(30,58,95,.15)}
-select.inp{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E") no-repeat right 12px center/12px;padding-right:32px}
+:root{--pri:#FF385C;--pri-dark:#E31C5F;--dark:#222222;--gray:#717171;--light:#F7F7F7;--border:#EBEBEB;--green:#008A05;--red:#C13515}
+*{box-sizing:border-box}
+body{font-family:'Inter','Hiragino Sans','Noto Sans JP',system-ui,sans-serif;background:var(--light);margin:0;color:var(--dark)}
+.btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;font-weight:600;transition:all .15s;cursor:pointer;padding:0 20px;font-size:14px;border:none}
+.btn-p{background:var(--pri);color:#fff}.btn-p:hover{background:var(--pri-dark)}
+.btn-dark{background:var(--dark);color:#fff}.btn-dark:hover{background:#000}
+.btn-d{background:var(--red);color:#fff}
+.btn-o{border:1.5px solid var(--border);color:var(--dark);background:#fff}.btn-o:hover{background:var(--light)}
+.btn-sm{min-height:36px;font-size:12px;padding:0 14px;border-radius:10px}
+.card{background:#fff;border-radius:16px;border:1px solid var(--border);padding:24px;margin-bottom:16px;transition:box-shadow .2s}
+.card:hover{box-shadow:0 6px 20px rgba(0,0,0,.06)}
+.kpi-card{background:#fff;border-radius:16px;border:1px solid var(--border);padding:20px;text-align:center;transition:box-shadow .2s}
+.kpi-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.06)}
+.kpi-val{font-size:26px;font-weight:800;color:var(--dark);letter-spacing:-0.5px}
+.kpi-label{font-size:12px;color:var(--gray);margin-top:4px;font-weight:500}
+.kpi-yoy{font-size:12px;font-weight:600;margin-top:6px}
+.yoy-up{color:var(--green)}.yoy-down{color:var(--red)}.yoy-flat{color:var(--gray)}
+.inp{width:100%;min-height:48px;border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;font-size:15px;transition:all .15s;background:#fff}
+.inp:focus{border-color:var(--dark);outline:none;box-shadow:0 0 0 2px rgba(34,34,34,.1)}
+select.inp{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23717171' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E") no-repeat right 14px center/12px;padding-right:36px}
 textarea.inp{min-height:120px;resize:vertical}
-.tab-bar{display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;gap:0;overflow-x:auto}
-.tab{padding:10px 16px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
-.tab.active{color:var(--navy);border-bottom-color:var(--accent)}
-.tab:hover{color:var(--navy)}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
-.modal-content{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;padding:24px;animation:slideUp .2s}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 24px;border-radius:12px;z-index:200;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:fadeIn .2s}
+.tab-bar{display:flex;gap:4px;margin-bottom:20px;overflow-x:auto;padding:4px;background:#fff;border-radius:14px;border:1px solid var(--border)}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-radius:10px;white-space:nowrap;transition:all .2s}
+.tab.active{color:#fff;background:var(--dark)}
+.tab:hover:not(.active){background:var(--light)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.modal-content{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;padding:28px;animation:slideUp .25s ease-out}
+@keyframes slideUp{from{transform:translateY(100%);opacity:.8}to{transform:translateY(0);opacity:1}}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:14px 28px;border-radius:14px;z-index:200;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.12);animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.ai-report{background:linear-gradient(135deg,#f8f9ff,#fff5eb);border:1px solid #e5e7eb;border-radius:12px;padding:16px;white-space:pre-wrap;font-size:14px;line-height:1.7;color:#1f2937}
-.nav-bottom{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;display:flex;z-index:50;padding:4px 0 env(safe-area-inset-bottom)}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;font-size:10px;color:#6b7280;cursor:pointer;transition:color .15s}
-.nav-item.active{color:var(--navy)}
-.nav-item i{font-size:20px;margin-bottom:2px}
+.ai-report{background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px;white-space:pre-wrap;font-size:14px;line-height:1.8;color:var(--dark);position:relative}
+.ai-report::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--pri),#FF880C);border-radius:16px 16px 0 0}
+.nav-bottom{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;z-index:50;padding:6px 0 env(safe-area-inset-bottom)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;font-size:10px;color:var(--gray);cursor:pointer;transition:all .15s;font-weight:500}
+.nav-item.active{color:var(--pri)}
+.nav-item i{font-size:20px;margin-bottom:3px}
 .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
-@media(min-width:640px){body{padding-bottom:0}.modal-content{border-radius:20px;margin:auto}}
+.trend-mini{display:flex;align-items:flex-end;gap:2px;height:32px}.trend-mini .bar{width:6px;border-radius:3px;background:var(--pri);opacity:.6;transition:all .2s}.trend-mini .bar:last-child{opacity:1}
+@media(min-width:640px){.modal-content{border-radius:24px;margin:auto}}
 </style>
 </head>
-<body class="pb-16">
+<body class="pb-20">
 
-<header class="bg-gradient-to-r from-blue-900 to-blue-800 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40">
-  <div class="flex items-center gap-2">
-    <i class="fas fa-chart-line text-orange-400"></i>
-    <span class="font-bold text-sm">民泊AI分析レポート</span>
+<header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+  <div class="flex items-center gap-2.5">
+    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-red-500 flex items-center justify-center"><i class="fab fa-airbnb text-white text-lg"></i></div>
+    <span class="font-bold text-sm text-gray-800">Airbnb 分析レポート</span>
   </div>
   <div class="flex items-center gap-3">
-    <span id="userLabel" class="text-xs text-blue-200"></span>
-    <button onclick="showSettings()" class="text-blue-200 hover:text-white"><i class="fas fa-cog"></i></button>
+    <span id="userLabel" class="text-xs text-gray-500 font-medium"></span>
+    <button onclick="showSettings()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition"><i class="fas fa-cog text-sm"></i></button>
   </div>
 </header>
 
@@ -67,14 +73,14 @@ textarea.inp{min-height:120px;resize:vertical}
 
 <script>
 const B='/trpreport';
-let user=null, charts={};
+let user=null;
 
 async function api(p,o){const r=await fetch(B+p,o);if(r.status===401){location.href=B+'/login';return null}return r.json()}
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
 function closeModal(){document.getElementById('modal').innerHTML=''}
 function showPage(p){document.querySelectorAll('.page').forEach(el=>el.classList.add('hidden'));const pg=document.getElementById('page-'+p);if(pg)pg.classList.remove('hidden');document.querySelectorAll('#bottomNav .nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===p))}
 function yoyClass(v){if(!v||v==='-')return 'yoy-flat';const s=v.replace(/['"]/g,'');if(s.startsWith('-'))return 'yoy-down';const n=parseFloat(s);return n>0?'yoy-up':n<0?'yoy-down':'yoy-flat'}
-function yoyArrow(v){if(!v||v==='-')return '-';const s=v.replace(/['"]/g,'');if(s.startsWith('-'))return '↓'+s;const n=parseFloat(s);return n>0?'↑'+s:s}
+function yoyArrow(v){if(!v||v==='-')return '-';const s=v.replace(/['"]/g,'');if(s.startsWith('-'))return '▼ '+s;const n=parseFloat(s);return n>0?'▲ '+s:s}
 function fmtMoney(v){return '¥'+Number(v||0).toLocaleString('ja-JP',{maximumFractionDigits:0})}
 
 
@@ -89,123 +95,192 @@ async function loadDashboard(){
   if(!curListing&&listings.length)curListing=listings[0].listing_id;
 
   el.innerHTML=`
-    <div class="flex gap-2 mb-4 flex-wrap">
-      <select id="selListing" class="inp flex-1" onchange="curListing=this.value;renderDash()">
+    <div class="flex gap-3 mb-5 flex-wrap">
+      <select id="selListing" class="inp flex-1" style="min-width:180px" onchange="curListing=this.value;renderDash()">
         ${listings.map(l=>`<option value="${l.listing_id}" ${l.listing_id===curListing?'selected':''}>${l.nickname||l.title||l.listing_id}</option>`).join('')}
       </select>
-      <select id="selMonth" class="inp" style="width:140px" onchange="curMonth=this.value;renderDash()">
+      <select id="selMonth" class="inp" style="width:150px" onchange="curMonth=this.value;renderDash()">
         ${months.map(m=>`<option value="${m}" ${m===curMonth?'selected':''}>${m}</option>`).join('')}
       </select>
     </div>
     <div class="tab-bar" id="dashTabs">
-      <div class="tab ${curTab==='summary'?'active':''}" onclick="switchTab('summary')"><i class="fas fa-chart-pie mr-1"></i>サマリー</div>
-      <div class="tab ${curTab==='funnel'?'active':''}" onclick="switchTab('funnel')"><i class="fas fa-filter mr-1"></i>ファネル</div>
-      <div class="tab ${curTab==='pricing'?'active':''}" onclick="switchTab('pricing')"><i class="fas fa-yen-sign mr-1"></i>価格</div>
-      <div class="tab ${curTab==='trend'?'active':''}" onclick="switchTab('trend')"><i class="fas fa-chart-line mr-1"></i>トレンド</div>
+      <div class="tab ${curTab==='summary'?'active':''}" data-tab="summary" onclick="switchTab('summary')">サマリー</div>
+      <div class="tab ${curTab==='funnel'?'active':''}" data-tab="funnel" onclick="switchTab('funnel')">ファネル</div>
+      <div class="tab ${curTab==='pricing'?'active':''}" data-tab="pricing" onclick="switchTab('pricing')">価格分析</div>
+      <div class="tab ${curTab==='trend'?'active':''}" data-tab="trend" onclick="switchTab('trend')">トレンド</div>
     </div>
     <div id="dashContent"></div>`;
   renderDash();
 }
 
-function switchTab(t){curTab=t;document.querySelectorAll('#dashTabs .tab').forEach(el=>el.classList.toggle('active',el.textContent.trim().toLowerCase().includes(t.charAt(0))));renderDash()}
+function switchTab(t){curTab=t;document.querySelectorAll('#dashTabs .tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));renderDash()}
 
 async function renderDash(){
   const c=document.getElementById('dashContent');
-  if(!curListing||!curMonth){c.innerHTML='<p class="text-gray-400 text-center py-8">データがありません。管理者にCSVアップロードを依頼してください。</p>';return}
-  c.innerHTML='<div class="text-center py-8"><i class="fas fa-spinner spin text-2xl text-blue-900"></i></div>';
-  const d=await api(`/api/data/${curListing}/${curMonth}`);
-  if(!d||d.error){c.innerHTML='<p class="text-gray-400 text-center py-8">データなし</p>';return}
+  if(!curListing||!curMonth){c.innerHTML='<p class="text-gray-400 text-center py-12">データがありません。管理者にCSVアップロードを依頼してください。</p>';return}
+  c.innerHTML='<div class="text-center py-12"><div class="w-8 h-8 border-3 border-gray-200 border-t-pink-500 rounded-full spin mx-auto"></div></div>';
+  const [d, range]=await Promise.all([api(`/api/data/${curListing}/${curMonth}`), api(`/api/data/${curListing}`)]);
+  if(!d||d.error){c.innerHTML='<p class="text-gray-400 text-center py-12">データなし</p>';return}
 
-  if(curTab==='summary')renderSummary(d,c);
+  if(curTab==='summary')renderSummary(d,c,range);
   else if(curTab==='funnel')renderFunnel(d,c);
-  else if(curTab==='pricing')renderPricing(d,c);
-  else if(curTab==='trend')renderTrend(d,c);
+  else if(curTab==='pricing')renderPricing(d,c,range);
+  else if(curTab==='trend')renderTrend(d,c,range);
 }
 
-function renderSummary(d,el){
+function miniTrend(range, key, el_id){
+  if(!range||range.length<2)return;
+  const vals=range.map(r=>r[key]||0);
+  const max=Math.max(...vals)||1;
+  const container=document.getElementById(el_id);
+  if(!container)return;
+  container.innerHTML=vals.map((v,i)=>`<div class="bar" style="height:${Math.max(4,v/max*100)}%;${i===vals.length-1?'opacity:1':''}"></div>`).join('');
+}
+
+function renderSummary(d,el,range){
   const convRate=(d.contact_rate*d.booking_rate/100).toFixed(1);
+  const viewEst=d.contact_rate>0?Math.round(d.reservations/(d.contact_rate*d.booking_rate/10000)):'-';
   el.innerHTML=`
     <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="kpi-card"><div class="kpi-val">${fmtMoney(d.revenue)}</div><div class="kpi-label">月間予約額</div><div class="kpi-yoy ${yoyClass(d.revenue_yoy)}">${yoyArrow(d.revenue_yoy)}</div></div>
-      <div class="kpi-card"><div class="kpi-val">${d.booked_nights}<span class="text-sm">泊</span></div><div class="kpi-label">稼働泊数</div><div class="kpi-yoy ${yoyClass(d.booked_nights_yoy)}">${yoyArrow(d.booked_nights_yoy)}</div></div>
-      <div class="kpi-card"><div class="kpi-val">${fmtMoney(d.adr)}</div><div class="kpi-label">ADR (客室単価)</div><div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div></div>
-      <div class="kpi-card"><div class="kpi-val">${convRate}<span class="text-sm">%</span></div><div class="kpi-label">全体成約率</div><div class="kpi-yoy yoy-flat">連絡${d.contact_rate}%×予約${d.booking_rate}%</div></div>
+      <div class="kpi-card">
+        <div class="kpi-val">${fmtMoney(d.revenue)}</div><div class="kpi-label">月間予約額</div>
+        <div class="kpi-yoy ${yoyClass(d.revenue_yoy)}">${yoyArrow(d.revenue_yoy)}</div>
+        <div class="trend-mini mt-2" id="mt-revenue"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">${d.booked_nights}<span class="text-base font-medium ml-0.5">泊</span></div><div class="kpi-label">稼働泊数</div>
+        <div class="kpi-yoy ${yoyClass(d.booked_nights_yoy)}">${yoyArrow(d.booked_nights_yoy)}</div>
+        <div class="trend-mini mt-2" id="mt-nights"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">${fmtMoney(d.adr)}</div><div class="kpi-label">ADR (客室単価)</div>
+        <div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div>
+        <div class="trend-mini mt-2" id="mt-adr"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">${convRate}<span class="text-base font-medium ml-0.5">%</span></div><div class="kpi-label">全体成約率</div>
+        <div class="text-xs text-gray-400 mt-1">連絡${d.contact_rate}% × 予約${d.booking_rate}%</div>
+      </div>
     </div>
-    <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="kpi-card"><div class="kpi-val text-lg">${d.reservations}<span class="text-sm">件</span></div><div class="kpi-label">予約数</div><div class="kpi-yoy ${yoyClass(d.reservations_yoy)}">${yoyArrow(d.reservations_yoy)}</div></div>
-      <div class="kpi-card"><div class="kpi-val text-lg">${d.avg_stay_days}<span class="text-sm">日</span></div><div class="kpi-label">平均滞在日数</div><div class="kpi-yoy ${yoyClass(d.avg_stay_days_yoy)}">${yoyArrow(d.avg_stay_days_yoy)}</div></div>
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="kpi-card">
+        <div class="kpi-val text-xl">${d.reservations}<span class="text-sm ml-0.5">件</span></div><div class="kpi-label">予約数</div>
+        <div class="kpi-yoy ${yoyClass(d.reservations_yoy)}">${yoyArrow(d.reservations_yoy)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val text-xl">${d.avg_lead_time}<span class="text-sm ml-0.5">日</span></div><div class="kpi-label">予約リードタイム</div>
+        <div class="kpi-yoy ${yoyClass(d.avg_lead_time_yoy)}">${yoyArrow(d.avg_lead_time_yoy)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val text-xl">${viewEst}</div><div class="kpi-label">推定閲覧数</div>
+        <div class="text-xs text-gray-400 mt-1">逆算</div>
+      </div>
     </div>
-    <div class="card"><div class="flex items-center justify-between mb-2"><h3 class="font-bold text-sm"><i class="fas fa-robot text-orange-500 mr-1"></i>運営からの月次報告</h3><button onclick="loadAiReport('summary',true)" class="btn btn-o btn-sm"><i class="fas fa-redo mr-1"></i>再生成</button></div><div id="ai-summary" class="ai-report"><div class="text-center py-4"><i class="fas fa-spinner spin text-blue-900"></i> AIレポート生成中...</div></div></div>`;
+    <div class="grid grid-cols-2 gap-3 mb-5">
+      <div class="kpi-card">
+        <div class="kpi-val text-xl">${d.avg_stay_days}<span class="text-sm ml-0.5">日</span></div><div class="kpi-label">平均滞在日数</div>
+        <div class="kpi-yoy ${yoyClass(d.avg_stay_days_yoy)}">${yoyArrow(d.avg_stay_days_yoy)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val text-xl">${d.contact_rate}<span class="text-sm ml-0.5">%</span></div><div class="kpi-label">連絡率</div>
+        <div class="kpi-yoy ${yoyClass(d.contact_rate_yoy)}">${yoyArrow(d.contact_rate_yoy)}</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="font-bold text-sm mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-500"></i>月次分析レポート</h3>
+      <div id="ai-summary" class="ai-report"><div class="text-center py-6"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto mb-2"></div><span class="text-sm text-gray-400">分析中...</span></div></div>
+    </div>`;
+  miniTrend(range,'revenue','mt-revenue');
+  miniTrend(range,'booked_nights','mt-nights');
+  miniTrend(range,'adr','mt-adr');
   loadAiReport('summary');
 }
 
 function renderFunnel(d,el){
   const convRate=(d.contact_rate*d.booking_rate/100).toFixed(2);
+  const viewEst=d.contact_rate>0?Math.round(d.reservations/(d.contact_rate*d.booking_rate/10000)):'-';
   el.innerHTML=`
-    <div class="card mb-4">
-      <h3 class="font-bold text-sm mb-4"><i class="fas fa-filter text-orange-500 mr-1"></i>予約ファネル</h3>
-      <div class="space-y-3">
-        <div><div class="flex justify-between text-sm mb-1"><span>閲覧（100%）</span><span class="font-bold">100%</span></div><div class="h-8 bg-blue-900 rounded-lg"></div></div>
-        <div><div class="flex justify-between text-sm mb-1"><span>連絡率</span><span class="font-bold ${yoyClass(d.contact_rate_yoy)}">${d.contact_rate}% <small>${yoyArrow(d.contact_rate_yoy)}</small></span></div><div class="h-8 rounded-lg" style="width:${Math.min(100,d.contact_rate*5)}%;background:var(--accent)"></div></div>
-        <div><div class="flex justify-between text-sm mb-1"><span>予約率（連絡後）</span><span class="font-bold ${yoyClass(d.booking_rate_yoy)}">${d.booking_rate}% <small>${yoyArrow(d.booking_rate_yoy)}</small></span></div><div class="h-8 rounded-lg" style="width:${Math.min(100,d.booking_rate)}%;background:#059669"></div></div>
-        <div class="pt-2 border-t"><div class="flex justify-between text-sm"><span class="font-bold">全体成約率</span><span class="font-bold text-blue-900">${convRate}%</span></div></div>
+    <div class="card">
+      <h3 class="font-bold text-sm mb-5">予約ファネル</h3>
+      <div class="space-y-4">
+        <div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">推定閲覧数</span><span class="font-bold">${viewEst}</span></div>
+          <div class="h-10 bg-gray-900 rounded-xl relative overflow-hidden"><div class="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700"></div><div class="absolute inset-y-0 left-4 flex items-center text-white text-xs font-bold">100%</div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">連絡率</span><span class="font-bold ${yoyClass(d.contact_rate_yoy)}">${d.contact_rate}% <small class="font-normal">${yoyArrow(d.contact_rate_yoy)}</small></span></div>
+          <div class="h-10 rounded-xl overflow-hidden bg-gray-100"><div class="h-full rounded-xl bg-gradient-to-r from-pink-500 to-rose-400 flex items-center pl-4 text-white text-xs font-bold" style="width:${Math.max(8,Math.min(100,d.contact_rate*5))}%">${d.contact_rate}%</div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">予約率（連絡後）</span><span class="font-bold ${yoyClass(d.booking_rate_yoy)}">${d.booking_rate}% <small class="font-normal">${yoyArrow(d.booking_rate_yoy)}</small></span></div>
+          <div class="h-10 rounded-xl overflow-hidden bg-gray-100"><div class="h-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 flex items-center pl-4 text-white text-xs font-bold" style="width:${Math.max(8,Math.min(100,d.booking_rate))}%">${d.booking_rate}%</div></div>
+        </div>
+        <div class="pt-3 mt-2 border-t flex justify-between items-center">
+          <span class="font-bold text-sm">全体成約率</span>
+          <span class="text-2xl font-extrabold" style="color:var(--pri)">${convRate}%</span>
+        </div>
       </div>
     </div>
-    <div class="card"><canvas id="funnelChart" height="200"></canvas></div>
-    <div class="card"><div class="flex items-center justify-between mb-2"><h3 class="font-bold text-sm"><i class="fas fa-robot text-orange-500 mr-1"></i>ファネル分析からの報告</h3><button onclick="loadAiReport('funnel',true)" class="btn btn-o btn-sm"><i class="fas fa-redo mr-1"></i>再生成</button></div><div id="ai-funnel" class="ai-report"><div class="text-center py-4"><i class="fas fa-spinner spin text-blue-900"></i></div></div></div>`;
-  new Chart(document.getElementById('funnelChart'),{type:'bar',data:{labels:['閲覧','連絡率','予約率','成約率'],datasets:[{data:[100,d.contact_rate,d.booking_rate,parseFloat(convRate)],backgroundColor:['#1e3a5f','#e67e22','#059669','#2563eb'],borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}}}}});
+    <div class="card">
+      <h3 class="font-bold text-sm mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-500"></i>ファネル分析レポート</h3>
+      <div id="ai-funnel" class="ai-report"><div class="text-center py-6"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto mb-2"></div><span class="text-sm text-gray-400">分析中...</span></div></div>
+    </div>`;
   loadAiReport('funnel');
 }
 
-function renderPricing(d,el){
+function renderPricing(d,el,range){
   el.innerHTML=`
     <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="kpi-card"><div class="kpi-val">${fmtMoney(d.adr)}</div><div class="kpi-label">ADR (客室単価)</div><div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div></div>
-      <div class="kpi-card"><div class="kpi-val">${d.avg_lead_time}<span class="text-sm">日</span></div><div class="kpi-label">平均リードタイム</div><div class="kpi-yoy ${yoyClass(d.avg_lead_time_yoy)}">${yoyArrow(d.avg_lead_time_yoy)}</div></div>
+      <div class="kpi-card">
+        <div class="kpi-val">${fmtMoney(d.adr)}</div><div class="kpi-label">ADR (客室単価)</div>
+        <div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">${d.avg_lead_time}<span class="text-base ml-0.5">日</span></div><div class="kpi-label">予約リードタイム</div>
+        <div class="kpi-yoy ${yoyClass(d.avg_lead_time_yoy)}">${yoyArrow(d.avg_lead_time_yoy)}</div>
+      </div>
     </div>
-    <div class="card"><canvas id="pricingChart" height="200"></canvas></div>
-    <div class="card"><div class="flex items-center justify-between mb-2"><h3 class="font-bold text-sm"><i class="fas fa-robot text-orange-500 mr-1"></i>価格戦略に関する報告</h3><button onclick="loadAiReport('pricing',true)" class="btn btn-o btn-sm"><i class="fas fa-redo mr-1"></i>再生成</button></div><div id="ai-pricing" class="ai-report"><div class="text-center py-4"><i class="fas fa-spinner spin text-blue-900"></i></div></div></div>`;
-  // ADR + Revenue chart
-  api(`/api/data/${curListing}`).then(range=>{
-    if(!range||!range.length)return;
-    new Chart(document.getElementById('pricingChart'),{type:'line',data:{labels:range.map(r=>r.year_month),datasets:[{label:'ADR',data:range.map(r=>r.adr),borderColor:'#1e3a5f',backgroundColor:'rgba(30,58,95,.1)',tension:.3,fill:true},{label:'予約額(万)',data:range.map(r=>r.revenue/10000),borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,.1)',tension:.3,yAxisID:'y2'}]},options:{responsive:true,scales:{y:{beginAtZero:true,title:{display:true,text:'ADR (¥)'}},y2:{position:'right',beginAtZero:true,title:{display:true,text:'予約額 (万円)'},grid:{drawOnChartArea:false}}}}});
-  });
+    <div class="card"><canvas id="pricingChart" height="220"></canvas></div>
+    <div class="card">
+      <h3 class="font-bold text-sm mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-500"></i>価格戦略レポート</h3>
+      <div id="ai-pricing" class="ai-report"><div class="text-center py-6"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto mb-2"></div><span class="text-sm text-gray-400">分析中...</span></div></div>
+    </div>`;
+  if(range?.length){
+    new Chart(document.getElementById('pricingChart'),{type:'line',data:{labels:range.map(r=>r.year_month),datasets:[{label:'ADR (¥)',data:range.map(r=>r.adr),borderColor:'#FF385C',backgroundColor:'rgba(255,56,92,.08)',tension:.4,fill:true,pointRadius:4,pointBackgroundColor:'#FF385C'},{label:'予約額 (万)',data:range.map(r=>r.revenue/10000),borderColor:'#222',backgroundColor:'rgba(34,34,34,.05)',tension:.4,yAxisID:'y2',pointRadius:4,pointBackgroundColor:'#222'}]},options:{responsive:true,plugins:{legend:{labels:{usePointStyle:true,padding:16}}},scales:{y:{beginAtZero:true,title:{display:true,text:'ADR (¥)'},grid:{color:'#f3f3f3'}},y2:{position:'right',beginAtZero:true,title:{display:true,text:'予約額 (万円)'},grid:{drawOnChartArea:false}}}}});
+  }
   loadAiReport('pricing');
 }
 
-async function renderTrend(d,el){
+async function renderTrend(d,el,range){
   el.innerHTML=`
-    <div class="card"><canvas id="trendChart" height="250"></canvas></div>
-    <div class="card"><h3 class="font-bold text-sm mb-3">前年比サマリー</h3>
-      <div class="space-y-2 text-sm">
-        <div class="flex justify-between"><span>予約数</span><span class="font-bold ${yoyClass(d.reservations_yoy)}">${yoyArrow(d.reservations_yoy)}</span></div>
-        <div class="flex justify-between"><span>予約額</span><span class="font-bold ${yoyClass(d.revenue_yoy)}">${yoyArrow(d.revenue_yoy)}</span></div>
-        <div class="flex justify-between"><span>稼働泊数</span><span class="font-bold ${yoyClass(d.booked_nights_yoy)}">${yoyArrow(d.booked_nights_yoy)}</span></div>
-        <div class="flex justify-between"><span>ADR</span><span class="font-bold ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</span></div>
-        <div class="flex justify-between"><span>連絡率</span><span class="font-bold ${yoyClass(d.contact_rate_yoy)}">${yoyArrow(d.contact_rate_yoy)}</span></div>
-        <div class="flex justify-between"><span>予約率</span><span class="font-bold ${yoyClass(d.booking_rate_yoy)}">${yoyArrow(d.booking_rate_yoy)}</span></div>
+    <div class="card"><canvas id="trendChart" height="260"></canvas></div>
+    <div class="card">
+      <h3 class="font-bold text-sm mb-4">前年比サマリー</h3>
+      <div class="space-y-3">
+        ${[['予約数',d.reservations_yoy],['予約額',d.revenue_yoy],['稼働泊数',d.booked_nights_yoy],['ADR',d.adr_yoy],['リードタイム',d.avg_lead_time_yoy],['連絡率',d.contact_rate_yoy],['予約率',d.booking_rate_yoy]].map(([k,v])=>`
+        <div class="flex justify-between items-center py-1.5 border-b border-gray-50"><span class="text-sm text-gray-600">${k}</span><span class="font-bold text-sm ${yoyClass(v)}">${yoyArrow(v)}</span></div>`).join('')}
       </div>
     </div>
-    <div class="card"><div class="flex items-center justify-between mb-2"><h3 class="font-bold text-sm"><i class="fas fa-robot text-orange-500 mr-1"></i>稼働状況に関する報告</h3><button onclick="loadAiReport('trend',true)" class="btn btn-o btn-sm"><i class="fas fa-redo mr-1"></i>再生成</button></div><div id="ai-trend" class="ai-report"><div class="text-center py-4"><i class="fas fa-spinner spin text-blue-900"></i></div></div></div>`;
-  const range=await api(`/api/data/${curListing}`);
+    <div class="card">
+      <h3 class="font-bold text-sm mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-500"></i>トレンド分析レポート</h3>
+      <div id="ai-trend" class="ai-report"><div class="text-center py-6"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto mb-2"></div><span class="text-sm text-gray-400">分析中...</span></div></div>
+    </div>`;
   if(range?.length>1){
     new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:range.map(r=>r.year_month),datasets:[
-      {label:'予約数',data:range.map(r=>r.reservations),borderColor:'#1e3a5f',tension:.3},
-      {label:'稼働泊数',data:range.map(r=>r.booked_nights),borderColor:'#059669',tension:.3},
-      {label:'連絡率(%)',data:range.map(r=>r.contact_rate),borderColor:'#e67e22',tension:.3}
-    ]},options:{responsive:true}});
+      {label:'予約数',data:range.map(r=>r.reservations),borderColor:'#FF385C',tension:.4,pointRadius:4,pointBackgroundColor:'#FF385C'},
+      {label:'稼働泊数',data:range.map(r=>r.booked_nights),borderColor:'#008A05',tension:.4,pointRadius:4,pointBackgroundColor:'#008A05'},
+      {label:'連絡率(%)',data:range.map(r=>r.contact_rate),borderColor:'#717171',tension:.4,borderDash:[5,3],pointRadius:3}
+    ]},options:{responsive:true,plugins:{legend:{labels:{usePointStyle:true,padding:16}}},scales:{y:{grid:{color:'#f3f3f3'}}}}});
   }else{
-    document.getElementById('trendChart').parentElement.innerHTML='<p class="text-gray-400 text-center text-sm py-4">複数月のデータが必要です</p>';
+    document.getElementById('trendChart').parentElement.innerHTML='<p class="text-gray-400 text-center text-sm py-6">複数月のデータが必要です</p>';
   }
   loadAiReport('trend');
 }
 
-async function loadAiReport(type,regen){
+async function loadAiReport(type){
   const el=document.getElementById('ai-'+type);
   if(!el)return;
-  el.innerHTML='<div class="text-center py-4"><i class="fas fa-spinner spin text-blue-900"></i> AIレポート生成中...</div>';
-  const url=`/api/ai-report/${curListing}/${curMonth}/${type}${regen?'?regenerate=1':''}`;
-  const r=await api(url);
+  const r=await api(`/api/ai-report/${curListing}/${curMonth}/${type}`);
   if(r?.content)el.textContent=r.content;
   else el.textContent='レポートを生成できませんでした。';
 }
@@ -215,15 +290,15 @@ async function loadAdminCsv(){
   const el=document.getElementById('page-admin-csv');
   const uploads=await api('/api/admin/uploads')||[];
   el.innerHTML=`
-    <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-file-csv text-orange-500 mr-2"></i>CSVアップロード</h2>
+    <h2 class="text-lg font-bold mb-4">CSVアップロード</h2>
     <div class="card">
-      <p class="text-xs text-gray-500 mb-3">Airbnb管理画面からダウンロードした月次CSVファイルを一括アップロード。年月は1行目から自動検出されます。</p>
+      <p class="text-sm text-gray-500 mb-3">Airbnb管理画面からダウンロードした月次CSVを一括アップロード。年月は1行目から自動検出されます。</p>
       <input type="file" id="csvFiles" accept=".csv" multiple class="inp mb-3">
-      <button onclick="uploadCsv()" class="btn btn-a w-full"><i class="fas fa-cloud-upload-alt mr-2"></i>アップロード</button>
+      <button onclick="uploadCsv()" class="btn btn-p w-full"><i class="fas fa-cloud-upload-alt mr-2"></i>アップロード</button>
       <div id="csvResult" class="mt-3"></div>
     </div>
-    <h3 class="text-sm font-bold text-gray-700 mb-2 mt-4">アップロード履歴</h3>
-    ${uploads.length?'<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="bg-blue-900 text-white"><th class="px-3 py-2">ファイル</th><th class="px-3 py-2">年月</th><th class="px-3 py-2">件数</th><th class="px-3 py-2">実行者</th><th class="px-3 py-2">日時</th></tr></thead><tbody>'+uploads.map(u=>`<tr class="border-b"><td class="px-3 py-2">${u.filename}</td><td class="px-3 py-2">${u.year_month}</td><td class="px-3 py-2 text-right">${u.rows_imported}</td><td class="px-3 py-2">${u.uploader||'-'}</td><td class="px-3 py-2">${(u.uploaded_at||'').replace('T',' ').substring(0,16)}</td></tr>`).join('')+'</tbody></table></div>':'<p class="text-gray-400 text-sm">まだアップロードされていません</p>'}`;
+    <h3 class="text-sm font-bold text-gray-700 mb-2 mt-6">アップロード履歴</h3>
+    ${uploads.length?'<div class="card p-0 overflow-hidden"><table class="w-full text-xs"><thead><tr class="bg-gray-900 text-white"><th class="px-3 py-2.5 text-left">ファイル</th><th class="px-3 py-2.5">年月</th><th class="px-3 py-2.5">件数</th><th class="px-3 py-2.5">実行者</th><th class="px-3 py-2.5">日時</th></tr></thead><tbody>'+uploads.map(u=>`<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="px-3 py-2.5">${u.filename}</td><td class="px-3 py-2.5 text-center">${u.year_month}</td><td class="px-3 py-2.5 text-right font-medium">${u.rows_imported}</td><td class="px-3 py-2.5">${u.uploader||'-'}</td><td class="px-3 py-2.5 text-gray-500">${(u.uploaded_at||'').replace('T',' ').substring(0,16)}</td></tr>`).join('')+'</tbody></table></div>':'<p class="text-gray-400 text-sm">まだアップロードされていません</p>'}`;
 }
 
 async function uploadCsv(){
@@ -231,12 +306,12 @@ async function uploadCsv(){
   if(!files.length){toast('ファイルを選択してください');return}
   const fd=new FormData();
   for(const f of files)fd.append('files',f);
-  document.getElementById('csvResult').innerHTML='<div class="text-center py-2"><i class="fas fa-spinner spin text-blue-900"></i></div>';
+  document.getElementById('csvResult').innerHTML='<div class="text-center py-3"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto"></div></div>';
   const r=await fetch(B+'/api/admin/csv',{method:'POST',body:fd}).then(x=>x.json());
   if(r?.results){
     document.getElementById('csvResult').innerHTML=r.results.map(x=>
-      x.success?`<div class="p-2 bg-green-50 rounded-lg text-sm text-green-800 mb-1">✅ ${x.file}: ${x.imported}件 (${x.yearMonth})</div>`
-      :`<div class="p-2 bg-red-50 rounded-lg text-sm text-red-700 mb-1">❌ ${x.file}: ${x.error}</div>`
+      x.success?`<div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 mb-2">✅ ${x.file}: ${x.imported}件 (${x.yearMonth})</div>`
+      :`<div class="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-2">❌ ${x.file}: ${x.error}</div>`
     ).join('');
     toast('アップロード完了');
     setTimeout(()=>loadAdminCsv(),1500);
@@ -250,17 +325,17 @@ async function loadAdminUsers(){
   const ROLES={admin:'管理者',owner:'オーナー'};
   const el=document.getElementById('page-admin-users');
   el.innerHTML=`
-    <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-users text-orange-500 mr-2"></i>アカウント管理</h2>
-    <button onclick="showAddUser()" class="btn btn-p w-full mb-4"><i class="fas fa-user-plus mr-1"></i>新規アカウント</button>
+    <h2 class="text-lg font-bold mb-4">アカウント管理</h2>
+    <button onclick="showAddUser()" class="btn btn-dark w-full mb-4"><i class="fas fa-user-plus mr-2"></i>新規アカウント</button>
     ${users.map(u=>`<div class="card">
       <div class="flex items-center justify-between mb-1">
-        <div><span class="font-bold">${u.display_name}</span> <span class="text-xs px-2 py-0.5 rounded-full ${u.role==='admin'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}">${ROLES[u.role]}</span></div>
+        <div><span class="font-bold">${u.display_name}</span> <span class="text-xs px-2 py-0.5 rounded-full ${u.role==='admin'?'bg-gray-900 text-white':'bg-pink-50 text-pink-600'} font-medium">${ROLES[u.role]}</span></div>
         <div class="flex gap-2">
-          <button onclick="showEditUser(${u.id})" class="text-blue-700"><i class="fas fa-edit"></i></button>
-          ${u.id!==user.id?`<button onclick="delUser(${u.id})" class="text-red-500"><i class="fas fa-trash"></i></button>`:''}
+          <button onclick="showEditUser(${u.id})" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200"><i class="fas fa-edit text-xs"></i></button>
+          ${u.id!==user.id?`<button onclick="delUser(${u.id})" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100"><i class="fas fa-trash text-xs"></i></button>`:''}
         </div>
       </div>
-      <div class="text-xs text-gray-500">@${u.username}${u.listings?.length?' | 物件: '+u.listings.map(l=>l.nickname||l.listing_id).join(', '):''}</div>
+      <div class="text-xs text-gray-500">@${u.username}${u.listings?.length?' · '+u.listings.map(l=>l.nickname||l.listing_id).join(', '):''}</div>
     </div>`).join('')}`;
   window._allListings=listings||[];
 }
@@ -269,56 +344,41 @@ function showAddUser(){
   const ls=window._allListings||[];
   document.getElementById('modal').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">👤 新規アカウント</h3>
+      <h3 class="text-lg font-bold mb-4">新規アカウント</h3>
       <div class="space-y-3">
-        <div><label class="text-xs text-gray-500">ユーザー名</label><input type="text" id="nuUser" class="inp"></div>
-        <div><label class="text-xs text-gray-500">表示名</label><input type="text" id="nuName" class="inp"></div>
-        <div><label class="text-xs text-gray-500">パスワード</label><input type="password" id="nuPass" class="inp"></div>
-        <div><label class="text-xs text-gray-500">権限</label><select id="nuRole" class="inp"><option value="owner">オーナー</option><option value="admin">管理者</option></select></div>
-        <div><label class="text-xs text-gray-500">紐付け物件</label>
-          <div class="max-h-40 overflow-y-auto border rounded-lg p-2">${ls.map(l=>`<label class="flex items-center gap-2 py-1 text-sm"><input type="checkbox" class="nu-listing" value="${l.listing_id}"><span>${l.nickname||l.title||l.listing_id}</span></label>`).join('')}</div>
+        <div><label class="text-xs font-medium text-gray-500">ユーザー名</label><input type="text" id="nuUser" class="inp"></div>
+        <div><label class="text-xs font-medium text-gray-500">表示名</label><input type="text" id="nuName" class="inp"></div>
+        <div><label class="text-xs font-medium text-gray-500">パスワード</label><input type="password" id="nuPass" class="inp"></div>
+        <div><label class="text-xs font-medium text-gray-500">権限</label><select id="nuRole" class="inp"><option value="owner">オーナー</option><option value="admin">管理者</option></select></div>
+        <div><label class="text-xs font-medium text-gray-500">紐付け物件</label>
+          <div class="max-h-40 overflow-y-auto border rounded-xl p-3">${ls.map(l=>`<label class="flex items-center gap-2 py-1.5 text-sm cursor-pointer"><input type="checkbox" class="nu-listing accent-pink-500" value="${l.listing_id}"><span>${l.nickname||l.title||l.listing_id}</span></label>`).join('')}</div>
         </div>
       </div>
-      <div class="flex gap-3 mt-4">
-        <button onclick="closeModal()" class="btn btn-o flex-1">キャンセル</button>
-        <button onclick="createUser()" class="btn btn-p flex-1">作成</button>
-      </div>
+      <div class="flex gap-3 mt-5"><button onclick="closeModal()" class="btn btn-o flex-1">キャンセル</button><button onclick="createUser()" class="btn btn-p flex-1">作成</button></div>
     </div></div>`;
 }
 
 async function createUser(){
   const ids=[...document.querySelectorAll('.nu-listing:checked')].map(c=>c.value);
-  const r=await api('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    username:document.getElementById('nuUser').value.trim(),
-    password:document.getElementById('nuPass').value,
-    display_name:document.getElementById('nuName').value.trim(),
-    role:document.getElementById('nuRole').value,
-    listing_ids:ids
-  })});
+  const r=await api('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('nuUser').value.trim(),password:document.getElementById('nuPass').value,display_name:document.getElementById('nuName').value.trim(),role:document.getElementById('nuRole').value,listing_ids:ids})});
   if(r?.success){closeModal();toast('作成しました');loadAdminUsers()}else toast(r?.error||'エラー');
 }
 
 function showEditUser(id){
   api('/api/admin/users').then(users=>{
     const u=users?.find(x=>x.id===id);if(!u)return;
-    const ls=window._allListings||[];
-    const uListings=u.listings?.map(l=>l.listing_id)||[];
+    const ls=window._allListings||[];const uL=u.listings?.map(l=>l.listing_id)||[];
     document.getElementById('modal').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">✏️ ${u.display_name}</h3>
+      <h3 class="text-lg font-bold mb-4">${u.display_name} を編集</h3>
       <div class="space-y-3">
-        <div><label class="text-xs text-gray-500">ユーザー名</label><input type="text" id="euUser" class="inp" value="${u.username}"></div>
-        <div><label class="text-xs text-gray-500">表示名</label><input type="text" id="euName" class="inp" value="${u.display_name}"></div>
-        <div><label class="text-xs text-gray-500">パスワード（変更時のみ）</label><input type="password" id="euPass" class="inp" placeholder="空欄で変更なし"></div>
-        <div><label class="text-xs text-gray-500">権限</label><select id="euRole" class="inp"><option value="owner" ${u.role==='owner'?'selected':''}>オーナー</option><option value="admin" ${u.role==='admin'?'selected':''}>管理者</option></select></div>
-        <div><label class="text-xs text-gray-500">紐付け物件</label>
-          <div class="max-h-40 overflow-y-auto border rounded-lg p-2">${ls.map(l=>`<label class="flex items-center gap-2 py-1 text-sm"><input type="checkbox" class="eu-listing" value="${l.listing_id}" ${uListings.includes(l.listing_id)?'checked':''}><span>${l.nickname||l.title||l.listing_id}</span></label>`).join('')}</div>
-        </div>
+        <div><label class="text-xs font-medium text-gray-500">ユーザー名</label><input type="text" id="euUser" class="inp" value="${u.username}"></div>
+        <div><label class="text-xs font-medium text-gray-500">表示名</label><input type="text" id="euName" class="inp" value="${u.display_name}"></div>
+        <div><label class="text-xs font-medium text-gray-500">パスワード（変更時のみ）</label><input type="password" id="euPass" class="inp" placeholder="空欄で変更なし"></div>
+        <div><label class="text-xs font-medium text-gray-500">権限</label><select id="euRole" class="inp"><option value="owner" ${u.role==='owner'?'selected':''}>オーナー</option><option value="admin" ${u.role==='admin'?'selected':''}>管理者</option></select></div>
+        <div><label class="text-xs font-medium text-gray-500">紐付け物件</label><div class="max-h-40 overflow-y-auto border rounded-xl p-3">${ls.map(l=>`<label class="flex items-center gap-2 py-1.5 text-sm cursor-pointer"><input type="checkbox" class="eu-listing accent-pink-500" value="${l.listing_id}" ${uL.includes(l.listing_id)?'checked':''}><span>${l.nickname||l.title||l.listing_id}</span></label>`).join('')}</div></div>
       </div>
-      <div class="flex gap-3 mt-4">
-        <button onclick="closeModal()" class="btn btn-o flex-1">キャンセル</button>
-        <button onclick="saveUser(${u.id})" class="btn btn-p flex-1">保存</button>
-      </div>
+      <div class="flex gap-3 mt-5"><button onclick="closeModal()" class="btn btn-o flex-1">キャンセル</button><button onclick="saveUser(${u.id})" class="btn btn-p flex-1">保存</button></div>
     </div></div>`;
   });
 }
@@ -336,43 +396,43 @@ async function delUser(id){if(!confirm('削除しますか？'))return;await api
 // ===================== 管理者: プロンプト =====================
 async function loadAdminPrompts(){
   const prompts=await api('/api/admin/prompts')||[];
-  const LABELS={summary:'総合サマリー',funnel:'ファネル分析',pricing:'価格戦略',trend:'トレンド分析'};
+  const LABELS={summary:'サマリー',funnel:'ファネル分析',pricing:'価格戦略',trend:'トレンド分析'};
   const el=document.getElementById('page-admin-prompts');
   el.innerHTML=`
-    <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-magic text-orange-500 mr-2"></i>AIプロンプト管理</h2>
+    <h2 class="text-lg font-bold mb-4">AIプロンプト管理</h2>
     ${prompts.map(p=>`<div class="card">
       <h3 class="font-bold text-sm mb-2">${LABELS[p.report_type]||p.report_type}</h3>
-      <textarea class="inp mb-2" id="prompt-${p.report_type}" rows="5">${p.system_prompt}</textarea>
+      <textarea class="inp mb-3" id="prompt-${p.report_type}" rows="5">${p.system_prompt}</textarea>
       <div class="flex gap-2">
-        <button onclick="savePrompt('${p.report_type}')" class="btn btn-p btn-sm flex-1"><i class="fas fa-save mr-1"></i>保存</button>
-        <button onclick="savePrompt('${p.report_type}',true)" class="btn btn-a btn-sm"><i class="fas fa-redo mr-1"></i>保存+キャッシュクリア</button>
+        <button onclick="savePrompt('${p.report_type}')" class="btn btn-dark btn-sm flex-1"><i class="fas fa-save mr-1"></i>保存</button>
+        <button onclick="savePrompt('${p.report_type}',true)" class="btn btn-p btn-sm"><i class="fas fa-redo mr-1"></i>+キャッシュクリア</button>
       </div>
     </div>`).join('')}`;
 }
 
-async function savePrompt(type,clearCache){
+async function savePrompt(type,cc){
   const text=document.getElementById('prompt-'+type).value;
-  const r=await api('/api/admin/prompts/'+type,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_prompt:text,clear_cache:!!clearCache})});
-  if(r?.success)toast(clearCache?'保存+キャッシュクリア完了':'保存しました');else toast('エラー');
+  const r=await api('/api/admin/prompts/'+type,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_prompt:text,clear_cache:!!cc})});
+  if(r?.success)toast(cc?'保存+キャッシュクリア完了':'保存しました');else toast('エラー');
 }
 
 // ===================== 設定 =====================
 function showSettings(){
   document.getElementById('modal').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">⚙️ 設定</h3>
-      <div class="space-y-2 mb-4">
-        <div class="flex justify-between py-2 border-b"><span class="text-sm">ユーザー</span><span class="font-bold text-sm">${user.display_name}</span></div>
-        <div class="flex justify-between py-2 border-b"><span class="text-sm">権限</span><span class="text-sm">${user.role==='admin'?'管理者':'オーナー'}</span></div>
+      <h3 class="text-lg font-bold mb-4">設定</h3>
+      <div class="space-y-2 mb-5">
+        <div class="flex justify-between py-2.5 border-b border-gray-100"><span class="text-sm text-gray-500">ユーザー</span><span class="font-bold text-sm">${user.display_name}</span></div>
+        <div class="flex justify-between py-2.5 border-b border-gray-100"><span class="text-sm text-gray-500">権限</span><span class="text-sm font-medium">${user.role==='admin'?'管理者':'オーナー'}</span></div>
       </div>
-      <div id="pkList" class="mb-3"></div>
-      <button onclick="closeModal();regPasskey()" class="btn btn-p w-full mb-2"><i class="fas fa-fingerprint mr-2"></i>パスキーを登録</button>
-      <button onclick="doLogout()" class="btn btn-d w-full mb-2"><i class="fas fa-sign-out-alt mr-2"></i>ログアウト</button>
+      <div id="pkList" class="mb-4"></div>
+      <button onclick="closeModal();regPasskey()" class="btn btn-dark w-full mb-2"><i class="fas fa-fingerprint mr-2"></i>パスキーを登録</button>
+      <button onclick="doLogout()" class="btn btn-p w-full mb-2"><i class="fas fa-sign-out-alt mr-2"></i>ログアウト</button>
       <button onclick="closeModal()" class="btn btn-o w-full">閉じる</button>
     </div></div>`;
   api('/api/passkeys').then(pks=>{
     if(!pks?.length)return;
-    document.getElementById('pkList').innerHTML='<h4 class="text-xs text-gray-500 mb-1">登録済みパスキー</h4>'+pks.map(p=>`<div class="flex items-center justify-between py-1 border-b text-sm"><span>${p.device_name||'パスキー'} <span class="text-xs text-gray-400">${(p.created_at||'').substring(0,10)}</span></span><button onclick="delPasskey('${p.id}')" class="text-red-400 text-xs"><i class="fas fa-trash"></i></button></div>`).join('');
+    document.getElementById('pkList').innerHTML='<h4 class="text-xs font-medium text-gray-500 mb-2">登録済みパスキー</h4>'+pks.map(p=>`<div class="flex items-center justify-between py-2 border-b border-gray-100 text-sm"><span>${p.device_name||'パスキー'} <span class="text-xs text-gray-400 ml-1">${(p.created_at||'').substring(0,10)}</span></span><button onclick="delPasskey('${p.id}')" class="text-red-400 text-xs hover:text-red-600"><i class="fas fa-trash"></i></button></div>`).join('');
   });
 }
 
@@ -400,19 +460,19 @@ async function regPasskey(){
   }catch(e){if(e.name==='NotAllowedError')toast('キャンセル');else toast(e.message)}
 }
 
-// ===================== ナビ構築 + 初期化 =====================
+// ===================== ナビ + 初期化 =====================
 function buildNav(){
   const nav=document.getElementById('bottomNav');
   let items=[];
   if(user.role==='admin'){
     items=[
-      {page:'dashboard',icon:'fa-chart-pie',label:'ダッシュボード',load:loadDashboard},
+      {page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard},
       {page:'admin-csv',icon:'fa-file-csv',label:'CSV',load:loadAdminCsv},
       {page:'admin-users',icon:'fa-users',label:'アカウント',load:loadAdminUsers},
-      {page:'admin-prompts',icon:'fa-magic',label:'プロンプト',load:loadAdminPrompts}
+      {page:'admin-prompts',icon:'fa-wand-magic-sparkles',label:'プロンプト',load:loadAdminPrompts}
     ];
   }else{
-    items=[{page:'dashboard',icon:'fa-chart-pie',label:'ダッシュボード',load:loadDashboard}];
+    items=[{page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard}];
   }
   nav.innerHTML=items.map(it=>`<div class="nav-item" data-page="${it.page}" onclick="navTo('${it.page}')"><i class="fas ${it.icon}"></i><span>${it.label}</span></div>`).join('');
   window._navItems=items;
