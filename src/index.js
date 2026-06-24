@@ -160,35 +160,55 @@ app.get(`${B}/api/ai-report/:listingId/:yearMonth/:type`, auth, async (req, res)
     + `予約率: ${data.booking_rate}% (前年比: ${data.booking_rate_yoy || '-'})`;
 
   try {
-    const fullPrompt = `${db.SYSTEM_PROMPT}\n\n${userPrompt}\n\n【データ】\n${dataStr}`;
-    // Use gsk summarize
-    const escaped = fullPrompt.replace(/'/g, "'\\''");
-    const content = execSync(`gsk web search --query '${escaped}' --max_tokens 800 2>/dev/null || echo '現在AIレポートを生成できません。しばらくしてから再度お試しください。'`, { encoding: 'utf-8', timeout: 30000 }).trim();
-
-    // Actually use gsk with a direct approach
-    const tmpFile = `/tmp/trpreport_ai_${Date.now()}.txt`;
-    fs.writeFileSync(tmpFile, fullPrompt);
-    let aiContent;
+    const systemMsg = `${db.SYSTEM_PROMPT}\n\n${userPrompt}`;
+    const userMsg = `以下のデータを分析してレポートを作成してください。300文字程度で簡潔にまとめてください。\n\n${dataStr}`;
+    const tmpPrompt = `/tmp/trpreport_prompt_${Date.now()}.txt`;
+    fs.writeFileSync(tmpPrompt, `${systemMsg}\n\n${userMsg}`);
+    let aiContent = null;
     try {
-      aiContent = execSync(`cat "${tmpFile}" | gsk web search --query "$(cat ${tmpFile})" --max_tokens 600 2>&1 || true`, { encoding: 'utf-8', timeout: 30000 }).trim();
-    } catch (e) {
-      aiContent = null;
+      const raw = execSync(
+        `gsk summarize "${tmpPrompt}" --question "上記のプロンプトとデータに基づいて日本語でレポートを作成してください"`,
+        { encoding: 'utf-8', timeout: 60000 }
+      ).trim();
+      // Extract 'answer:' portion from gsk output (JSON has "answer": "..." or stdout has answer: ...)
+      try {
+        const j = JSON.parse(raw);
+        aiContent = j?.data?.result || null;
+        if (aiContent) {
+          // Extract after 'answer:' if present
+          const aIdx = aiContent.indexOf('answer:');
+          if (aIdx >= 0) aiContent = aiContent.substring(aIdx + 7).trim();
+          // Remove trailing Source: lines
+          aiContent = aiContent.replace(/\n*Source:.*$/s, '').trim();
+        }
+      } catch (_) {
+        // Not JSON, try to find answer: in raw text
+        const aIdx = raw.indexOf('answer:');
+        if (aIdx >= 0) {
+          aiContent = raw.substring(aIdx + 7).replace(/\n*Source:.*$/s, '').trim();
+        } else {
+          aiContent = raw;
+        }
+      }
+    } catch (e2) {
+      console.error('gsk summarize error:', e2.message);
     }
-    fs.unlinkSync(tmpFile).catch?.(() => {});
+    try { fs.unlinkSync(tmpPrompt); } catch (_) {}
 
-    // Fallback: generate a template report
-    if (!aiContent || aiContent.length < 20) {
+    if (!aiContent || aiContent.length < 30) {
       aiContent = generateTemplateReport(type, data, listing, yearMonth);
     }
 
     db.saveAiReport(listingId, yearMonth, type, aiContent);
     res.json({ content: aiContent, cached: false });
   } catch (e) {
+    console.error('AI report error:', e.message);
     const fallback = generateTemplateReport(type, data, listing, yearMonth);
     db.saveAiReport(listingId, yearMonth, type, fallback);
     res.json({ content: fallback, cached: false });
   }
 });
+
 
 function generateTemplateReport(type, data, listing, ym) {
   const name = listing?.nickname || listing?.title || '対象物件';
