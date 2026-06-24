@@ -85,20 +85,6 @@ function fmtMoney(v){return '¥'+Number(v||0).toLocaleString('ja-JP',{maximumFra
 
 
 // ===================== ダッシュボード =====================
-let curListing='', curMonth='', curTab='summary';
-
-async function loadDashboard(){
-  const el=document.getElementById('page-dashboard');
-  const [listings, months]=await Promise.all([api('/api/listings'),api('/api/months')]);
-  if(!listings||!months)return;
-  if(!curMonth&&months.length)curMonth=months[0];
-  if(!curListing&&listings.length)curListing=listings[0].listing_id;
-
-  el.innerHTML=`
-    <div class="flex gap-3 mb-5 flex-wrap">
-
-
-// ===================== ダッシュボード =====================
 let curListing='', curMonth='', curTab='summary', allRange=[];
 
 async function loadDashboard(){
