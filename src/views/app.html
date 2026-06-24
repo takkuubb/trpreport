@@ -96,7 +96,21 @@ async function loadDashboard(){
 
   el.innerHTML=`
     <div class="flex gap-3 mb-5 flex-wrap">
-      <select id="selListing" class="inp flex-1" style="min-width:180px" onchange="curListing=this.value;renderDash()">
+
+
+// ===================== ダッシュボード =====================
+let curListing='', curMonth='', curTab='summary', allRange=[];
+
+async function loadDashboard(){
+  const el=document.getElementById('page-dashboard');
+  const [listings, months]=await Promise.all([api('/api/listings'),api('/api/months')]);
+  if(!listings||!months)return;
+  if(!curMonth&&months.length)curMonth=months[0];
+  if(!curListing&&listings.length)curListing=listings[0].listing_id;
+
+  el.innerHTML=`
+    <div class="flex gap-3 mb-5 flex-wrap">
+      <select id="selListing" class="inp flex-1" style="min-width:180px" onchange="curListing=this.value;allRange=[];renderDash()">
         ${listings.map(l=>`<option value="${l.listing_id}" ${l.listing_id===curListing?'selected':''}>${l.nickname||l.title||l.listing_id}</option>`).join('')}
       </select>
       <select id="selMonth" class="inp" style="width:150px" onchange="curMonth=this.value;renderDash()">
@@ -105,6 +119,7 @@ async function loadDashboard(){
     </div>
     <div class="tab-bar" id="dashTabs">
       <div class="tab ${curTab==='summary'?'active':''}" data-tab="summary" onclick="switchTab('summary')">サマリー</div>
+      <div class="tab ${curTab==='detail'?'active':''}" data-tab="detail" onclick="switchTab('detail')">詳細</div>
       <div class="tab ${curTab==='funnel'?'active':''}" data-tab="funnel" onclick="switchTab('funnel')">ファネル</div>
       <div class="tab ${curTab==='pricing'?'active':''}" data-tab="pricing" onclick="switchTab('pricing')">価格分析</div>
       <div class="tab ${curTab==='trend'?'active':''}" data-tab="trend" onclick="switchTab('trend')">トレンド</div>
@@ -119,13 +134,15 @@ async function renderDash(){
   const c=document.getElementById('dashContent');
   if(!curListing||!curMonth){c.innerHTML='<p class="text-gray-400 text-center py-12">データがありません。管理者にCSVアップロードを依頼してください。</p>';return}
   c.innerHTML='<div class="text-center py-12"><div class="w-8 h-8 border-3 border-gray-200 border-t-pink-500 rounded-full spin mx-auto"></div></div>';
-  const [d, range]=await Promise.all([api(`/api/data/${curListing}/${curMonth}`), api(`/api/data/${curListing}`)]);
-  if(!d||d.error){c.innerHTML='<p class="text-gray-400 text-center py-12">データなし</p>';return}
+  if(!allRange.length) allRange = await api(`/api/data/${curListing}`) || [];
+  const d = allRange.find(r=>r.year_month===curMonth);
+  if(!d){c.innerHTML='<p class="text-gray-400 text-center py-12">データなし</p>';return}
 
-  if(curTab==='summary')renderSummary(d,c,range);
-  else if(curTab==='funnel')renderFunnel(d,c);
-  else if(curTab==='pricing')renderPricing(d,c,range);
-  else if(curTab==='trend')renderTrend(d,c,range);
+  if(curTab==='summary')renderSummary(d,c,allRange);
+  else if(curTab==='detail')renderDetail(d,c,allRange);
+  else if(curTab==='funnel')renderFunnel(d,c,allRange);
+  else if(curTab==='pricing')renderPricing(d,c,allRange);
+  else if(curTab==='trend')renderTrend(d,c,allRange);
 }
 
 function miniTrend(range, key, el_id){
@@ -137,9 +154,11 @@ function miniTrend(range, key, el_id){
   container.innerHTML=vals.map((v,i)=>`<div class="bar" style="height:${Math.max(4,v/max*100)}%;${i===vals.length-1?'opacity:1':''}"></div>`).join('');
 }
 
+function estViews(d){return d.contact_rate>0?Math.round(d.reservations/(d.contact_rate*d.booking_rate/10000)):'-'}
+
 function renderSummary(d,el,range){
   const convRate=(d.contact_rate*d.booking_rate/100).toFixed(1);
-  const viewEst=d.contact_rate>0?Math.round(d.reservations/(d.contact_rate*d.booking_rate/10000)):'-';
+  const viewEst=estViews(d);
   el.innerHTML=`
     <div class="grid grid-cols-2 gap-3 mb-4">
       <div class="kpi-card">
@@ -196,28 +215,111 @@ function renderSummary(d,el,range){
   loadAiReport('summary');
 }
 
-function renderFunnel(d,el){
+// ===================== 詳細タブ =====================
+function renderDetail(d,el,range){
+  // Sort by year_month desc (newest left)
+  const sorted=[...range].sort((a,b)=>b.year_month.localeCompare(a.year_month));
+  const metrics=[
+    {key:'revenue',label:'月間予約額',yoy:'revenue_yoy',fmt:v=>fmtMoney(v)},
+    {key:'reservations',label:'予約数',yoy:'reservations_yoy',fmt:v=>v+'件'},
+    {key:'adr',label:'客室単価 (ADR)',yoy:'adr_yoy',fmt:v=>fmtMoney(v)},
+    {key:'booked_nights',label:'稼働泊数',yoy:'booked_nights_yoy',fmt:v=>v+'泊'},
+    {key:'avg_stay_days',label:'平均滞在日数',yoy:'avg_stay_days_yoy',fmt:v=>v+'日'},
+    {key:'_conv',label:'全体成約率',yoy:null,fmt:null},
+    {key:'avg_lead_time',label:'予約リードタイム',yoy:'avg_lead_time_yoy',fmt:v=>v+'日'},
+    {key:'contact_rate',label:'連絡率',yoy:'contact_rate_yoy',fmt:v=>v+'%'},
+  ];
+
+  const thCells=sorted.map(r=>`<th class="px-3 py-2.5 text-center whitespace-nowrap min-w-[100px]">${r.year_month}</th>`).join('');
+
+  let rows='';
+  for(const m of metrics){
+    // Value row
+    rows+=`<tr class="border-b border-gray-100">`;
+    rows+=`<td class="px-3 py-2.5 font-medium text-sm whitespace-nowrap sticky left-0 bg-white z-10 border-r border-gray-100">${m.label}</td>`;
+    for(const r of sorted){
+      let val;
+      if(m.key==='_conv'){
+        val=(r.contact_rate*r.booking_rate/100).toFixed(1)+'%';
+      } else {
+        val=m.fmt(r[m.key]||0);
+      }
+      rows+=`<td class="px-3 py-2.5 text-center text-sm font-semibold">${val}</td>`;
+    }
+    rows+=`</tr>`;
+    // YoY row
+    rows+=`<tr class="border-b border-gray-50 bg-gray-50/50">`;
+    rows+=`<td class="px-3 py-1.5 text-xs text-gray-400 sticky left-0 bg-gray-50/80 z-10 border-r border-gray-100">└ 昨対</td>`;
+    for(const r of sorted){
+      let yoyVal='-';
+      if(m.key==='_conv'){
+        yoyVal='-';
+      } else if(m.yoy){
+        yoyVal=r[m.yoy]||'-';
+      }
+      rows+=`<td class="px-3 py-1.5 text-center text-xs font-semibold ${yoyClass(yoyVal)}">${yoyArrow(yoyVal)}</td>`;
+    }
+    rows+=`</tr>`;
+  }
+
+  el.innerHTML=`
+    <div class="card p-0 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead><tr class="bg-gray-900 text-white text-xs">
+            <th class="px-3 py-2.5 text-left whitespace-nowrap sticky left-0 bg-gray-900 z-20 min-w-[130px]">指標</th>
+            ${thCells}
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ===================== ファネル =====================
+function renderFunnel(d,el,range){
   const convRate=(d.contact_rate*d.booking_rate/100).toFixed(2);
-  const viewEst=d.contact_rate>0?Math.round(d.reservations/(d.contact_rate*d.booking_rate/10000)):'-';
+  const viewEst=estViews(d);
+  // Find previous month data
+  const curIdx=range.findIndex(r=>r.year_month===curMonth);
+  const prev=curIdx>0?range[curIdx-1]:null;
+  const prevConv=prev?(prev.contact_rate*prev.booking_rate/100).toFixed(2):null;
+  const prevViews=prev?estViews(prev):null;
+
+  function dualBar(label, curVal, curPct, prevVal, prevPct, color, gradFrom, gradTo){
+    const showPrev=prev && prevVal!==null;
+    return `<div>
+      <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">${label}</span><span class="font-bold">${curVal}</span></div>
+      <div class="h-10 rounded-xl overflow-hidden bg-gray-100 mb-1"><div class="h-full rounded-xl bg-gradient-to-r ${gradFrom} ${gradTo} flex items-center pl-4 text-white text-xs font-bold" style="width:${Math.max(8,curPct)}%">${curPct<100?curPct.toFixed(1)+'%':curVal}</div></div>
+      ${showPrev?`<div class="h-6 rounded-lg overflow-hidden bg-gray-50 opacity-60"><div class="h-full rounded-lg bg-gray-400 flex items-center pl-3 text-white text-[10px] font-medium" style="width:${Math.max(6,prevPct)}%">前月 ${prevVal}</div></div>`:''}
+    </div>`;
+  }
+
   el.innerHTML=`
     <div class="card">
-      <h3 class="font-bold text-sm mb-5">予約ファネル</h3>
+      <h3 class="font-bold text-sm mb-5">予約ファネル${prev?' <span class="text-xs font-normal text-gray-400 ml-1">（灰色=前月 '+prev.year_month+'）</span>':''}</h3>
       <div class="space-y-4">
-        <div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">推定閲覧数</span><span class="font-bold">${viewEst}</span></div>
-          <div class="h-10 bg-gray-900 rounded-xl relative overflow-hidden"><div class="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700"></div><div class="absolute inset-y-0 left-4 flex items-center text-white text-xs font-bold">100%</div></div>
-        </div>
-        <div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">連絡率</span><span class="font-bold ${yoyClass(d.contact_rate_yoy)}">${d.contact_rate}% <small class="font-normal">${yoyArrow(d.contact_rate_yoy)}</small></span></div>
-          <div class="h-10 rounded-xl overflow-hidden bg-gray-100"><div class="h-full rounded-xl bg-gradient-to-r from-pink-500 to-rose-400 flex items-center pl-4 text-white text-xs font-bold" style="width:${Math.max(8,Math.min(100,d.contact_rate*5))}%">${d.contact_rate}%</div></div>
-        </div>
-        <div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="font-medium">予約率（連絡後）</span><span class="font-bold ${yoyClass(d.booking_rate_yoy)}">${d.booking_rate}% <small class="font-normal">${yoyArrow(d.booking_rate_yoy)}</small></span></div>
-          <div class="h-10 rounded-xl overflow-hidden bg-gray-100"><div class="h-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 flex items-center pl-4 text-white text-xs font-bold" style="width:${Math.max(8,Math.min(100,d.booking_rate))}%">${d.booking_rate}%</div></div>
-        </div>
+        ${dualBar(
+          '推定閲覧数', viewEst, 100,
+          prevViews, 100,
+          'gray','from-gray-800','to-gray-700'
+        )}
+        ${dualBar(
+          '連絡率', d.contact_rate+'%', Math.min(100,d.contact_rate*5),
+          prev?prev.contact_rate+'%':null, prev?Math.min(100,prev.contact_rate*5):0,
+          'pink','from-pink-500','to-rose-400'
+        )}
+        ${dualBar(
+          '予約率（連絡後）', d.booking_rate+'%', Math.min(100,d.booking_rate),
+          prev?prev.booking_rate+'%':null, prev?Math.min(100,prev.booking_rate):0,
+          'green','from-emerald-500','to-green-400'
+        )}
         <div class="pt-3 mt-2 border-t flex justify-between items-center">
           <span class="font-bold text-sm">全体成約率</span>
-          <span class="text-2xl font-extrabold" style="color:var(--pri)">${convRate}%</span>
+          <div class="text-right">
+            <span class="text-2xl font-extrabold" style="color:var(--pri)">${convRate}%</span>
+            ${prevConv?`<div class="text-xs text-gray-400">前月 ${prevConv}%</div>`:''}
+          </div>
         </div>
       </div>
     </div>
@@ -284,7 +386,6 @@ async function loadAiReport(type){
   if(r?.content)el.textContent=r.content;
   else el.textContent='レポートを生成できませんでした。';
 }
-
 // ===================== 管理者: CSV =====================
 async function loadAdminCsv(){
   const el=document.getElementById('page-admin-csv');
