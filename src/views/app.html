@@ -1028,6 +1028,15 @@ async function showStayDetail(lid,noHash){
     </div></div>`;
   }
 
+  // AI Analysis section
+  h+=`<div class="card" id="stayAiSection">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="font-bold text-sm"><i class="fas fa-lightbulb mr-1" style="color:#FFB400"></i>AI分析レポート</h3>
+      <button class="text-xs text-gray-400 hover:text-pink-500" onclick="loadStayAi('${lid}',true)" title="再生成"><i class="fas fa-sync-alt"></i></button>
+    </div>
+    <div id="stayAiContent" class="text-sm text-gray-600 leading-relaxed"><div class="flex items-center gap-2 text-gray-400"><div class="animate-spin w-4 h-4 border-2 border-pink-200 border-t-pink-500 rounded-full"></div><span class="text-xs">AI分析を生成中...</span></div></div>
+  </div>`;
+
   // Records table
   h+=`<div class="card overflow-x-auto"><h4 class="font-bold text-xs mb-3">明細一覧</h4>
   <table class="w-full text-xs" style="min-width:900px"><thead class="bg-gray-50">
@@ -1089,6 +1098,25 @@ async function showStayDetail(lid,noHash){
       const pct=(d.cnt/natTotal*100).toFixed(1);
       return `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i%colors.length]}"></span><span class="flex-1">${d.nationality}</span><span class="font-bold">${d.cnt}件(${pct}%)</span><span class="text-gray-400">${d.adults}A/${d.children}C/${d.infants}I</span></div>`;
     }).join('');
+  }
+  // Load AI analysis asynchronously
+  loadStayAi(lid);
+}
+
+async function loadStayAi(lid, regen){
+  const el=document.getElementById('stayAiContent');
+  if(!el)return;
+  el.innerHTML='<div class="flex items-center gap-2 text-gray-400"><div class="animate-spin w-4 h-4 border-2 border-pink-200 border-t-pink-500 rounded-full"></div><span class="text-xs">AI分析を生成中...</span></div>';
+  try{
+    const url='/api/stay/ai/'+lid+'/'+stayMonth+(regen?'?regenerate=1':'');
+    const r=await api(url);
+    if(r?.content){
+      el.innerHTML='<p class="whitespace-pre-wrap">'+r.content+'</p>'+(r.cached?'<div class="text-xs text-gray-300 mt-2">キャッシュ済み</div>':'');
+    }else{
+      el.innerHTML='<p class="text-gray-400 text-xs">AI分析を取得できませんでした</p>';
+    }
+  }catch(e){
+    el.innerHTML='<p class="text-gray-400 text-xs">AI分析の生成に失敗しました</p>';
   }
 }
 

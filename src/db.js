@@ -73,14 +73,14 @@ function migrate() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       listing_id TEXT NOT NULL,
       year_month TEXT NOT NULL,
-      report_type TEXT NOT NULL CHECK(report_type IN ('summary','detail','funnel','pricing','trend','portfolio')),
+      report_type TEXT NOT NULL CHECK(report_type IN ('summary','detail','funnel','pricing','trend','portfolio','stay')),
       content TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(listing_id, year_month, report_type)
     );
     CREATE TABLE IF NOT EXISTS ai_prompts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      report_type TEXT NOT NULL UNIQUE CHECK(report_type IN ('summary','detail','funnel','pricing','trend','portfolio')),
+      report_type TEXT NOT NULL UNIQUE CHECK(report_type IN ('summary','detail','funnel','pricing','trend','portfolio','stay')),
       system_prompt TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -138,6 +138,7 @@ const DEFAULT_PROMPTS = {
   pricing: `以下のデータを分析してください：\n- ADRの水準と変動\n- 予約リードタイムの傾向\n- 価格設定の最適化に関する提案\n- 運営側で検討を進める料金調整案\n250文字程度で簡潔に。挨拶や見出しなしで分析内容から始める。`,
   trend: `以下のデータを分析してください：\n- 主要指標の前年比トレンド\n- 改善傾向にある指標と悪化傾向にある指標\n- 競合環境の変化の可能性\n- 運営側で進める付加価値向上策\n250文字程度で簡潔に。挨拶や見出しなしで分析内容から始める。`,
   detail: `以下の月別実績推移データを分析してください：\n- 各月の主要KPI（予約額・予約数・ADR・稼働泊数）の変動\n- 前年同月比で特に変化が大きい指標\n- 季節要因やトレンドの読み取り\n- 今後の運営で注力すべきポイント\n250文字程度で簡潔に。挨拶や見出しなしで分析内容から始める。`,
+  stay: `施設の宿泊実績データ（ゲスト国籍・人数構成・売上・清掃費・純売上・オーナー収益）を分析してください。\n以下の観点で分析してください：\n1. 国籍構成の特徴（インバウンド比率、主要国籍とその傾向）\n2. ゲスト人数の傾向（平均人数、ファミリー/カップル/グループの割合推定）\n3. 売上と収益性（泊単価、純売上率、オーナー収益率）\n4. 改善ポイントや注目すべき傾向\n挨拶や見出しは不要です。分析内容から直接始めてください。ですます調で250文字程度にまとめてください。`,
   portfolio: `以下は全リスティングのポートフォリオ全体データです。\n分析してください：\n- 全体の売上・稼働状況と前月比・前年同月比の変動\n- エリア別の強み・弱み（稼ぎ頭と課題エリア）\n- 売上TOP物件と成長著しい物件の特徴\n- ADR・成約率から見る価格戦略の有効性\n- 前年比下落物件の原因仮説と運営側の対応方針\n- 来月以降の運営戦略の提言\n500文字程度で簡潔に。挨拶や見出しなしで分析内容から始める。`,
 };
 
@@ -149,6 +150,39 @@ function seedDefaults() {
     console.log('Created default admin: admin / admin123');
   }
   // Seed prompts
+
+  // Migrate ai_reports/ai_prompts CHECK constraints to include 'stay'
+  try {
+    db.prepare("INSERT INTO ai_reports (listing_id,year_month,report_type,content) VALUES('_chk','_chk','stay','_chk')").run();
+    db.prepare("DELETE FROM ai_reports WHERE listing_id='_chk'").run();
+  } catch(_) {
+    // Need to recreate tables with updated CHECK
+    db.exec(`
+      CREATE TABLE ai_reports_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        listing_id TEXT NOT NULL,
+        year_month TEXT NOT NULL,
+        report_type TEXT NOT NULL CHECK(report_type IN ('summary','detail','funnel','pricing','trend','portfolio','stay')),
+        content TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(listing_id, year_month, report_type)
+      );
+      INSERT INTO ai_reports_new SELECT * FROM ai_reports;
+      DROP TABLE ai_reports;
+      ALTER TABLE ai_reports_new RENAME TO ai_reports;
+
+      CREATE TABLE ai_prompts_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_type TEXT NOT NULL UNIQUE CHECK(report_type IN ('summary','detail','funnel','pricing','trend','portfolio','stay')),
+        system_prompt TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO ai_prompts_new SELECT * FROM ai_prompts;
+      DROP TABLE ai_prompts;
+      ALTER TABLE ai_prompts_new RENAME TO ai_prompts;
+    `);
+  }
+
   const ins = db.prepare('INSERT OR IGNORE INTO ai_prompts (report_type, system_prompt) VALUES (?,?)');
   for (const [type, prompt] of Object.entries(DEFAULT_PROMPTS)) ins.run(type, prompt);
 }

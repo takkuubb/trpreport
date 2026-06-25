@@ -514,6 +514,105 @@ app.get(`${B}/api/stay/nat-by-listing/:yearMonth`, auth, (req, res) => {
   res.json(result);
 });
 
+
+// Stay AI report per listing
+app.get(`${B}/api/stay/ai/:listingId/:yearMonth`, auth, async (req, res) => {
+  const { listingId, yearMonth } = req.params;
+  // Owner check
+  const ownerIds = getOwnerListingIds(req);
+  if (ownerIds && !ownerIds.includes(listingId)) return res.status(403).json({ error: 'アクセス権限がありません' });
+
+  // Check cache
+  const cached = db.getAiReport(listingId, yearMonth, 'stay');
+  if (cached && !req.query.regenerate) return res.json({ content: cached.content, cached: true });
+
+  // Gather stay data
+  const records = db.getStayRecordsByListing(listingId, yearMonth);
+  const natData = db.getStayNationalitySummary(yearMonth, listingId);
+  const listing = db.listListings().find(x => x.listing_id === listingId);
+  if (!records.length) return res.status(404).json({ error: 'データなし' });
+
+  const totalAmount = records.reduce((s,r) => s + r.amount, 0);
+  const totalNights = records.reduce((s,r) => s + r.nights, 0);
+  const totalGuests = records.reduce((s,r) => s + r.total_guests, 0);
+  const totalAdults = records.reduce((s,r) => s + r.adults, 0);
+  const totalChildren = records.reduce((s,r) => s + r.children, 0);
+  const totalInfants = records.reduce((s,r) => s + r.infants, 0);
+  const totalNetRev = records.reduce((s,r) => s + r.net_revenue, 0);
+  const totalOwnerRev = records.reduce((s,r) => s + r.owner_revenue, 0);
+  const totalCleanFee = records.reduce((s,r) => s + r.cleaning_fee, 0);
+  const avgNightlyRate = totalNights > 0 ? Math.round(totalAmount / totalNights) : 0;
+
+  const natStr = natData.map(n => `${n.nationality}: ${n.cnt}件(${(n.cnt/records.length*100).toFixed(1)}%) ${n.adults}A/${n.children}C/${n.infants}I`).join('\n');
+
+  const dataStr = `物件: ${listing?.title || listingId} (${listing?.nickname || ''}, ${listing?.area || ''})
+期間: ${yearMonth}
+予約件数: ${records.length}件
+総泊数: ${totalNights}泊
+ゲスト合計: ${totalGuests}名 (大人${totalAdults}/子供${totalChildren}/幼児${totalInfants})
+平均ゲスト数: ${(totalGuests/records.length).toFixed(1)}名/件
+金額合計: ¥${totalAmount.toLocaleString()}
+泊単価: ¥${avgNightlyRate.toLocaleString()}
+清掃料金合計: ¥${totalCleanFee.toLocaleString()}
+純売上: ¥${totalNetRev.toLocaleString()} (純売上率: ${(totalNetRev/totalAmount*100).toFixed(1)}%)
+オーナー収益: ¥${totalOwnerRev.toLocaleString()} (収益率: ${(totalOwnerRev/totalAmount*100).toFixed(1)}%)
+
+【国籍構成】
+${natStr}
+
+【個別予約明細】
+${records.map(r => `${r.start_date} ${r.nights}泊 ${r.guest_name}(${r.nationality}) ${r.total_guests}名 ¥${r.amount.toLocaleString()}`).join('\n')}`;
+
+  const promptRow = db.getPrompt('stay');
+  const userPrompt = promptRow?.system_prompt || db.DEFAULT_PROMPTS.stay || '';
+
+  try {
+    const systemMsg = `${db.SYSTEM_PROMPT}\n\n${userPrompt}`;
+    const userMsg = `以下の宿泊実績データを分析してレポートを作成してください。300文字程度で簡潔にまとめてください。\n\n${dataStr}`;
+    const tmpPrompt = `/tmp/trpreport_stay_prompt_${Date.now()}.txt`;
+    fs.writeFileSync(tmpPrompt, `${systemMsg}\n\n${userMsg}`);
+    let aiContent = null;
+    try {
+      const raw = execSync(
+        `gsk summarize "${tmpPrompt}" --question "上記のプロンプトとデータに基づいて日本語で宿泊実績分析レポートを作成してください"`,
+        { encoding: 'utf-8', timeout: 60000 }
+      ).trim();
+      try {
+        const j = JSON.parse(raw);
+        aiContent = j?.data?.result || null;
+        if (aiContent) {
+          const aIdx = aiContent.indexOf('answer:');
+          if (aIdx >= 0) aiContent = aiContent.substring(aIdx + 7).trim();
+          aiContent = aiContent.replace(/\n*Source:.*$/s, '').trim();
+        }
+      } catch (_) {
+        const aIdx = raw.indexOf('answer:');
+        if (aIdx >= 0) aiContent = raw.substring(aIdx + 7).replace(/\n*Source:.*$/s, '').trim();
+        else aiContent = raw;
+      }
+    } catch (e2) { console.error('gsk summarize error (stay):', e2.message); }
+    try { fs.unlinkSync(tmpPrompt); } catch (_) {}
+
+    if (!aiContent || aiContent.length < 30) {
+      // Template fallback
+      const jpCnt = natData.find(n => n.nationality === 'Japan')?.cnt || 0;
+      const intlPct = records.length > 0 ? Math.round((records.length - jpCnt) / records.length * 100) : 0;
+      const topNat = natData.slice(0, 3).map(n => n.nationality).join('・');
+      aiContent = `${yearMonth}の宿泊実績は${records.length}件・${totalNights}泊、ゲスト${totalGuests}名です。泊単価¥${avgNightlyRate.toLocaleString()}、純売上¥${totalNetRev.toLocaleString()}（純売上率${(totalNetRev/totalAmount*100).toFixed(1)}%）。国籍構成はインバウンド比率${intlPct}%で、主要国籍は${topNat}です。平均ゲスト数${(totalGuests/records.length).toFixed(1)}名/件となっています。`;
+    }
+
+    db.saveAiReport(listingId, yearMonth, 'stay', aiContent);
+    res.json({ content: aiContent, cached: false });
+  } catch (e) {
+    console.error('Stay AI report error:', e.message);
+    const jpCnt = natData.find(n => n.nationality === 'Japan')?.cnt || 0;
+    const intlPct = records.length > 0 ? Math.round((records.length - jpCnt) / records.length * 100) : 0;
+    const fallback = `${yearMonth}は${records.length}件・${totalNights}泊。泊単価¥${avgNightlyRate.toLocaleString()}、純売上率${(totalNetRev/totalAmount*100).toFixed(1)}%。インバウンド${intlPct}%。`;
+    db.saveAiReport(listingId, yearMonth, 'stay', fallback);
+    res.json({ content: fallback, cached: false });
+  }
+});
+
 // Init
 db.getDb();
 
