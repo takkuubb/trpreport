@@ -991,7 +991,10 @@ function renderNatChart(data){
 }
 
 async function showStayDetail(lid,noHash){
-  if(!noHash) location.hash='admin-stay/'+lid;
+  if(!noHash){
+    window._skipHash=true;
+    location.hash='admin-stay/'+lid;
+  }
   const ct=document.getElementById('stayContent');
   ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
   const [records,natData]=await Promise.all([
@@ -999,7 +1002,7 @@ async function showStayDetail(lid,noHash){
     api(`/api/stay/nationality/${stayMonth}?listing_id=${lid}`)
   ]);
   const listing=stayData.summary?.find(s=>s.listing_id===lid)||{};
-  let h=`<button onclick="location.hash='admin-stay'" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
+  let h=`<button onclick="window._skipHash=true;location.hash='admin-stay';renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
   h+=`<div class="card">
     <div class="flex items-center gap-3 mb-4">
       ${listing.image_url?`<img src="${listing.image_url}" class="w-16 h-16 rounded-xl object-cover">`:''}
@@ -1160,12 +1163,15 @@ function navTo(page,noHash){
 
   // Hash-based routing
   function handleHash(){
+    if(window._skipHash){window._skipHash=false;return}
     const hash=(location.hash||'').replace('#','');
     if(!hash){navTo('dashboard',true);return}
     if(hash.startsWith('admin-stay/')){
       const lid=hash.split('/')[1];
-      navTo('admin-stay',true);
+      showPage('admin-stay');
       if(lid) showStayDetail(lid,true);
+    }else if(hash==='admin-stay'){
+      navTo('admin-stay',true);
     }else{
       const item=window._navItems?.find(x=>x.page===hash);
       if(item) navTo(hash,true); else navTo('dashboard',true);
