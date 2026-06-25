@@ -990,7 +990,8 @@ function renderNatChart(data){
   }).join('');
 }
 
-async function showStayDetail(lid){
+async function showStayDetail(lid,noHash){
+  if(!noHash) location.hash='admin-stay/'+lid;
   const ct=document.getElementById('stayContent');
   ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
   const [records,natData]=await Promise.all([
@@ -998,7 +999,7 @@ async function showStayDetail(lid){
     api(`/api/stay/nationality/${stayMonth}?listing_id=${lid}`)
   ]);
   const listing=stayData.summary?.find(s=>s.listing_id===lid)||{};
-  let h=`<button onclick="renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
+  let h=`<button onclick="location.hash='admin-stay'" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
   h+=`<div class="card">
     <div class="flex items-center gap-3 mb-4">
       ${listing.image_url?`<img src="${listing.image_url}" class="w-16 h-16 rounded-xl object-cover">`:''}
@@ -1008,20 +1009,23 @@ async function showStayDetail(lid){
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
       <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_amount)}</div><div class="kpi-label">金額合計</div></div>
       <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_net_revenue)}</div><div class="kpi-label">純売上</div></div>
-      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_mgmt_fee)}</div><div class="kpi-label">運営代行手数料</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_mgmt_fee)}</div><div class="kpi-label">運営手数料</div></div>
       <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_owner_revenue)}</div><div class="kpi-label">オーナー様収益</div></div>
     </div>
   </div>`;
 
-  // Nationality mini
+  // Nationality chart + breakdown
   if(natData.length){
-    h+=`<div class="card"><h4 class="font-bold text-xs mb-2">国籍構成</h4><div class="flex flex-wrap gap-2">`;
-    const total=natData.reduce((a,c)=>a+c.cnt,0);
-    for(const n of natData){
-      const pct=(n.cnt/total*100).toFixed(0);
-      h+=`<span class="text-xs bg-gray-100 rounded-full px-3 py-1">${n.nationality} ${n.cnt}件(${pct}%) ${n.adults}A/${n.children}C/${n.infants}I</span>`;
-    }
-    h+=`</div></div>`;
+    const natTotal=natData.reduce((a,c)=>a+c.cnt,0);
+    const guestTotal=natData.reduce((a,c)=>a+c.guests,0);
+    h+=`<div class="card"><h3 class="font-bold text-sm mb-3"><i class="fas fa-globe mr-1" style="color:var(--pri)"></i>国籍構成 <span class="text-gray-400 font-normal">${natTotal}件・${guestTotal}名</span></h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div style="max-width:220px;margin:0 auto"><canvas id="detailNatDonut" height="220"></canvas></div>
+      <div>
+        <div class="mb-3"><canvas id="detailNatBar" height="${Math.max(120,natData.length*28)}"></canvas></div>
+        <div class="space-y-1.5 text-xs" id="detailNatList"></div>
+      </div>
+    </div></div>`;
   }
 
   // Records table
@@ -1030,7 +1034,7 @@ async function showStayDetail(lid){
   <tr><th class="px-2 py-2 text-left">日付</th><th class="px-2 py-2 text-right">泊</th><th class="px-2 py-2 text-left">ゲスト</th>
   <th class="px-2 py-2 text-right">金額</th><th class="px-2 py-2 text-right">手数料</th><th class="px-2 py-2 text-right">清掃料</th>
   <th class="px-2 py-2 text-right">総売上</th><th class="px-2 py-2 text-right">清掃代行</th><th class="px-2 py-2 text-right">純売上</th>
-  <th class="px-2 py-2 text-right">代行費</th><th class="px-2 py-2 text-right">オーナー収益</th><th class="px-2 py-2 text-left">確認コード</th></tr></thead><tbody>`;
+  <th class="px-2 py-2 text-right">運営手数料</th><th class="px-2 py-2 text-right">オーナー収益</th><th class="px-2 py-2 text-left">確認コード</th></tr></thead><tbody>`;
   let totals={amount:0,svc:0,clean:0,rev:0,co:0,net:0,mgmt:0,own:0};
   for(const r of records){
     totals.amount+=r.amount;totals.svc+=r.service_fee;totals.clean+=r.cleaning_fee;
@@ -1064,6 +1068,28 @@ async function showStayDetail(lid){
     <td class="px-2 py-2"></td></tr>`;
   h+=`</tbody></table></div>`;
   ct.innerHTML=h;
+
+  // Render detail nationality charts
+  if(natData.length){
+    const colors=['#FF385C','#00A699','#FC642D','#484848','#767676','#008489','#FF5A5F','#FFB400','#914669','#61C0BF','#ECC94B','#38B2AC','#ED64A6','#4299E1','#48BB78','#ED8936'];
+    const natTotal=natData.reduce((a,b)=>a+b.cnt,0);
+    // Donut
+    const donutEl=document.getElementById('detailNatDonut');
+    if(donutEl) new Chart(donutEl,{type:'doughnut',data:{labels:natData.map(d=>d.nationality),datasets:[{data:natData.map(d=>d.cnt),backgroundColor:colors.slice(0,natData.length),borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw}件 (${(ctx.raw/natTotal*100).toFixed(1)}%)`}}}}});
+    // Horizontal bar (guest count by nationality)
+    const barEl=document.getElementById('detailNatBar');
+    if(barEl) new Chart(barEl,{type:'bar',data:{labels:natData.map(d=>d.nationality),datasets:[
+      {label:'大人',data:natData.map(d=>d.adults),backgroundColor:'#FF385C'},
+      {label:'子供',data:natData.map(d=>d.children),backgroundColor:'#FFB400'},
+      {label:'幼児',data:natData.map(d=>d.infants),backgroundColor:'#61C0BF'}
+    ]},options:{indexAxis:'y',responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{display:false},ticks:{font:{size:10}}}}}});
+    // Legend list
+    const listEl=document.getElementById('detailNatList');
+    if(listEl) listEl.innerHTML=natData.map((d,i)=>{
+      const pct=(d.cnt/natTotal*100).toFixed(1);
+      return `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i%colors.length]}"></span><span class="flex-1">${d.nationality}</span><span class="font-bold">${d.cnt}件(${pct}%)</span><span class="text-gray-400">${d.adults}A/${d.children}C/${d.infants}I</span></div>`;
+    }).join('');
+  }
 }
 
 // ===================== ナビ + 初期化 =====================
@@ -1072,7 +1098,7 @@ function buildNav(){
   let items=[];
   if(user.role==='admin'){
     items=[
-      {page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard},
+      {page:'dashboard',icon:'fa-calendar-check',label:'レポート',load:loadDashboard},
       {page:'admin-report',icon:'fa-chart-bar',label:'全体',load:loadAdminReport},
       {page:'admin-stay',icon:'fa-bed',label:'宿泊',load:loadStay},
       {page:'admin-csv',icon:'fa-file-csv',label:'CSV',load:loadAdminCsv},
@@ -1082,7 +1108,7 @@ function buildNav(){
     ];
   }else{
     items=[
-      {page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard},
+      {page:'dashboard',icon:'fa-calendar-check',label:'レポート',load:loadDashboard},
       {page:'admin-stay',icon:'fa-bed',label:'宿泊',load:loadStay}
     ];
   }
@@ -1090,7 +1116,12 @@ function buildNav(){
   window._navItems=items;
 }
 
-function navTo(page){showPage(page);const item=window._navItems?.find(x=>x.page===page);if(item?.load)item.load()}
+function navTo(page,noHash){
+  showPage(page);
+  const item=window._navItems?.find(x=>x.page===page);
+  if(item?.load)item.load();
+  if(!noHash) location.hash=page;
+}
 
 (async()=>{
   const r=await api('/api/auth/me');
@@ -1098,7 +1129,22 @@ function navTo(page){showPage(page);const item=window._navItems?.find(x=>x.page=
   user=r.user;
   document.getElementById('userLabel').textContent=user.display_name;
   buildNav();
-  navTo('dashboard');
+
+  // Hash-based routing
+  function handleHash(){
+    const hash=(location.hash||'').replace('#','');
+    if(!hash){navTo('dashboard',true);return}
+    if(hash.startsWith('admin-stay/')){
+      const lid=hash.split('/')[1];
+      navTo('admin-stay',true);
+      if(lid) showStayDetail(lid,true);
+    }else{
+      const item=window._navItems?.find(x=>x.page===hash);
+      if(item) navTo(hash,true); else navTo('dashboard',true);
+    }
+  }
+  window.addEventListener('hashchange',handleHash);
+  if(location.hash) handleHash(); else navTo('dashboard');
 })();
 </script>
 </body>
