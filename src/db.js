@@ -430,6 +430,15 @@ function importStayRecords(records, yearMonth) {
   })();
   return count;
 }
+
+// Helper: build listing ID filter for owner-scoped queries
+function listingFilter(listingIds, prefix='') {
+  if (!listingIds || !listingIds.length) return { clause: '', params: [] };
+  const col = prefix ? prefix + '.listing_id' : 'listing_id';
+  const ph = listingIds.map(()=>'?').join(',');
+  return { clause: ` AND ${col} IN (${ph})`, params: listingIds };
+}
+
 function getStayRecordsByListing(listingId, yearMonth) {
   return db.prepare('SELECT * FROM stay_records WHERE listing_id=? AND year_month=? ORDER BY start_date').all(listingId, yearMonth);
 }
@@ -437,7 +446,8 @@ function getStayRecordsByMonth(yearMonth) {
   return db.prepare(`SELECT sr.*, l.nickname, l.title, l.area, l.image_url FROM stay_records sr
     LEFT JOIN listings l ON sr.listing_id=l.listing_id WHERE sr.year_month=? ORDER BY sr.listing_id, sr.start_date`).all(yearMonth);
 }
-function getStaySummaryByListing(yearMonth) {
+function getStaySummaryByListing(yearMonth, listingIds) {
+  const f = listingFilter(listingIds, 'sr');
   return db.prepare(`SELECT sr.listing_id, l.nickname, l.title, l.area, l.image_url, l.airbnb_url,
     COUNT(*) as booking_count, SUM(sr.nights) as total_nights, SUM(sr.total_guests) as total_guests,
     SUM(sr.adults) as total_adults, SUM(sr.children) as total_children, SUM(sr.infants) as total_infants,
@@ -447,19 +457,24 @@ function getStaySummaryByListing(yearMonth) {
     SUM(sr.mgmt_fee) as total_mgmt_fee, SUM(sr.owner_revenue) as total_owner_revenue,
     ROUND(SUM(sr.amount)*1.0/NULLIF(SUM(sr.nights),0),0) as nightly_rate
     FROM stay_records sr LEFT JOIN listings l ON sr.listing_id=l.listing_id
-    WHERE sr.year_month=? GROUP BY sr.listing_id ORDER BY SUM(sr.amount) DESC`).all(yearMonth);
+    WHERE sr.year_month=?` + f.clause + ` GROUP BY sr.listing_id ORDER BY SUM(sr.amount) DESC`).all(yearMonth, ...f.params);
 }
-function getStayNationalitySummary(yearMonth, listingId) {
-  const w = listingId ? 'WHERE year_month=? AND listing_id=?' : 'WHERE year_month=?';
-  const p = listingId ? [yearMonth, listingId] : [yearMonth];
+function getStayNationalitySummary(yearMonth, listingId, listingIds) {
+  let w = 'WHERE year_month=?';
+  let p = [yearMonth];
+  if (listingId) { w += ' AND listing_id=?'; p.push(listingId); }
+  const f = listingFilter(listingIds);
+  w += f.clause; p.push(...f.params);
   return db.prepare(`SELECT nationality, COUNT(*) as cnt, SUM(total_guests) as guests,
     SUM(adults) as adults, SUM(children) as children, SUM(infants) as infants
     FROM stay_records ${w} GROUP BY nationality ORDER BY cnt DESC`).all(...p);
 }
-function getStayMonths() {
-  return db.prepare('SELECT DISTINCT year_month FROM stay_records ORDER BY year_month DESC').all().map(r=>r.year_month);
+function getStayMonths(listingIds) {
+  const f = listingFilter(listingIds);
+  return db.prepare('SELECT DISTINCT year_month FROM stay_records WHERE 1=1' + f.clause + ' ORDER BY year_month DESC').all(...f.params).map(r=>r.year_month);
 }
-function getStayOverall(yearMonth) {
+function getStayOverall(yearMonth, listingIds) {
+  const f = listingFilter(listingIds);
   return db.prepare(`SELECT COUNT(*) as booking_count, COUNT(DISTINCT listing_id) as listing_count,
     SUM(nights) as total_nights, SUM(total_guests) as total_guests,
     SUM(adults) as total_adults, SUM(children) as total_children, SUM(infants) as total_infants,
@@ -469,14 +484,15 @@ function getStayOverall(yearMonth) {
     SUM(mgmt_fee) as total_mgmt_fee, SUM(owner_revenue) as total_owner_revenue,
     ROUND(SUM(amount)*1.0/NULLIF(SUM(nights),0),0) as avg_nightly_rate,
     ROUND(SUM(total_guests)*1.0/COUNT(*),1) as avg_guests_per_booking
-    FROM stay_records WHERE year_month=?`).get(yearMonth);
+    FROM stay_records WHERE year_month=?` + f.clause).get(yearMonth, ...f.params);
 }
 
 
-function getStayNatGroupByListing(yearMonth) {
+function getStayNatGroupByListing(yearMonth, listingIds) {
+  const f = listingFilter(listingIds);
   return db.prepare(`SELECT listing_id, nationality, COUNT(*) as cnt
-    FROM stay_records WHERE year_month=?
-    GROUP BY listing_id, nationality ORDER BY listing_id, cnt DESC`).all(yearMonth);
+    FROM stay_records WHERE year_month=?` + f.clause + `
+    GROUP BY listing_id, nationality ORDER BY listing_id, cnt DESC`).all(yearMonth, ...f.params);
 }
 
 module.exports = {

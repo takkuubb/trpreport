@@ -1081,7 +1081,10 @@ function buildNav(){
       {page:'admin-prompts',icon:'fa-wand-magic-sparkles',label:'プロンプト',load:loadAdminPrompts}
     ];
   }else{
-    items=[{page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard}];
+    items=[
+      {page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard},
+      {page:'admin-stay',icon:'fa-bed',label:'宿泊',load:loadStay}
+    ];
   }
   nav.innerHTML=items.map(it=>`<div class="nav-item" data-page="${it.page}" onclick="navTo('${it.page}')"><i class="fas ${it.icon}"></i><span>${it.label}</span></div>`).join('');
   window._navItems=items;

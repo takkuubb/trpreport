@@ -457,42 +457,54 @@ app.post(`${B}/api/admin/stay/import`, auth, admin, (req, res) => {
 });
 
 // Get stay months
+
+// Get listing IDs for owner-scoped queries (null for admin = no filter)
+function getOwnerListingIds(req) {
+  if (req.session.user.role === 'admin') return null;
+  return db.getUserListings(req.session.user.id).map(l => l.listing_id);
+}
+
 app.get(`${B}/api/stay/months`, auth, (req, res) => {
-  res.json(db.getStayMonths());
+  res.json(db.getStayMonths(getOwnerListingIds(req)));
 });
 
 // Get overall summary for a month
 app.get(`${B}/api/stay/overall/:yearMonth`, auth, (req, res) => {
-  const d = db.getStayOverall(req.params.yearMonth);
+  const d = db.getStayOverall(req.params.yearMonth, getOwnerListingIds(req));
   if (!d) return res.status(404).json({ error: 'データなし' });
   res.json(d);
 });
 
 // Get per-listing summary
 app.get(`${B}/api/stay/summary/:yearMonth`, auth, (req, res) => {
-  res.json(db.getStaySummaryByListing(req.params.yearMonth));
+  res.json(db.getStaySummaryByListing(req.params.yearMonth, getOwnerListingIds(req)));
 });
 
 // Get nationality breakdown
 app.get(`${B}/api/stay/nationality/:yearMonth`, auth, (req, res) => {
   const lid = req.query.listing_id;
-  res.json(db.getStayNationalitySummary(req.params.yearMonth, lid || null));
+  res.json(db.getStayNationalitySummary(req.params.yearMonth, lid || null, getOwnerListingIds(req)));
 });
 
 // Get records for a specific listing
 app.get(`${B}/api/stay/records/:yearMonth/:listingId`, auth, (req, res) => {
+  const ownerIds = getOwnerListingIds(req);
+  if (ownerIds && !ownerIds.includes(req.params.listingId)) return res.status(403).json({ error: 'アクセス権限がありません' });
   res.json(db.getStayRecordsByListing(req.params.listingId, req.params.yearMonth));
 });
 
 // Get all records for a month
 app.get(`${B}/api/stay/records/:yearMonth`, auth, (req, res) => {
-  res.json(db.getStayRecordsByMonth(req.params.yearMonth));
+  let records = db.getStayRecordsByMonth(req.params.yearMonth);
+  const ownerIds = getOwnerListingIds(req);
+  if (ownerIds) records = records.filter(r => ownerIds.includes(r.listing_id));
+  res.json(records);
 });
 
 
 // Get nationality grouped by listing
 app.get(`${B}/api/stay/nat-by-listing/:yearMonth`, auth, (req, res) => {
-  const rows = db.getStayNatGroupByListing(req.params.yearMonth);
+  const rows = db.getStayNatGroupByListing(req.params.yearMonth, getOwnerListingIds(req));
   // Group by listing_id
   const result = {};
   for (const r of rows) {
