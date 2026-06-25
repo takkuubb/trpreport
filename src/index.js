@@ -149,7 +149,20 @@ app.get(`${B}/api/ai-report/:listingId/:yearMonth/:type`, auth, async (req, res)
   const promptRow = db.getPrompt(type);
   const userPrompt = promptRow?.system_prompt || db.DEFAULT_PROMPTS[type] || '';
 
-  const dataStr = `物件: ${listing?.title || listingId} (${listing?.nickname || ''}, ${listing?.area || ''})\n期間: ${yearMonth}\n`
+  // For detail type, include all months data
+  let rangeData = [];
+  if (type === 'detail') {
+    rangeData = db.getMonthlyDataRange(listingId) || [];
+  }
+
+  const dataStr = type === 'detail'
+    ? `物件: ${listing?.title || listingId} (${listing?.nickname || ''}, ${listing?.area || ''})\n`
+      + `対象月: ${yearMonth}\n\n【月別実績推移】\n`
+      + [...rangeData].sort((a,b) => b.year_month.localeCompare(a.year_month)).map(r =>
+        `${r.year_month}: 予約額¥${Number(r.revenue||0).toLocaleString()} / ${r.reservations||0}件 / ADR¥${Number(r.adr||0).toLocaleString()} / ${r.booked_nights||0}泊 / 滞在${r.avg_stay_days||0}日 / 連絡率${r.contact_rate||0}% / 予約率${r.booking_rate||0}% / LT${r.avg_lead_time||0}日`
+        + (r.revenue_yoy ? ` (予約額YoY:${r.revenue_yoy})` : '')
+      ).join('\n')
+    : `物件: ${listing?.title || listingId} (${listing?.nickname || ''}, ${listing?.area || ''})\n期間: ${yearMonth}\n`
     + `予約数: ${data.reservations} (前年比: ${data.reservations_yoy || '-'})\n`
     + `予約額: ¥${data.revenue?.toLocaleString()} (前年比: ${data.revenue_yoy || '-'})\n`
     + `稼働泊数: ${data.booked_nights} (前年比: ${data.booked_nights_yoy || '-'})\n`
@@ -196,21 +209,21 @@ app.get(`${B}/api/ai-report/:listingId/:yearMonth/:type`, auth, async (req, res)
     try { fs.unlinkSync(tmpPrompt); } catch (_) {}
 
     if (!aiContent || aiContent.length < 30) {
-      aiContent = generateTemplateReport(type, data, listing, yearMonth);
+      aiContent = generateTemplateReport(type, data, listing, yearMonth, listingId);
     }
 
     db.saveAiReport(listingId, yearMonth, type, aiContent);
     res.json({ content: aiContent, cached: false });
   } catch (e) {
     console.error('AI report error:', e.message);
-    const fallback = generateTemplateReport(type, data, listing, yearMonth);
+    const fallback = generateTemplateReport(type, data, listing, yearMonth, listingId);
     db.saveAiReport(listingId, yearMonth, type, fallback);
     res.json({ content: fallback, cached: false });
   }
 });
 
 
-function generateTemplateReport(type, data, listing, ym) {
+function generateTemplateReport(type, data, listing, ym, listingId) {
   const name = listing?.nickname || listing?.title || '対象物件';
   const convRate = (data.contact_rate * data.booking_rate / 100).toFixed(2);
   switch (type) {
@@ -222,6 +235,14 @@ function generateTemplateReport(type, data, listing, ym) {
       return `ADR¥${Number(data.adr).toLocaleString()}（${data.adr_yoy||'-'}）、リードタイム${data.avg_lead_time}日（${data.avg_lead_time_yoy||'-'}）。\n予約単価とタイミングのバランスを考慮した料金戦略を運営側で検討する。`;
     case 'trend':
       return `予約${data.reservations}件（${data.reservations_yoy||'-'}）、予約額¥${Number(data.revenue).toLocaleString()}（${data.revenue_yoy||'-'}）、稼働${data.booked_nights}泊（${data.booked_nights_yoy||'-'}）。\n前年比を踏まえた改善施策を運営側で進める。`;
+    case 'detail': {
+      const rangeD = db.getMonthlyDataRange(listingId) || [];
+      const sorted = rangeD.sort((a,b) => b.year_month.localeCompare(a.year_month));
+      if (sorted.length < 2) return `${ym}の実績: 予約額¥${Number(data.revenue).toLocaleString()}、${data.reservations}件、ADR¥${Number(data.adr).toLocaleString()}。比較期間のデータ蓄積後に詳細トレンド分析を行う。`;
+      const latest = sorted[0];
+      const prev = sorted[1];
+      return `直近${sorted.length}ヶ月の推移を確認。${latest.year_month}は予約額¥${Number(latest.revenue).toLocaleString()}（${latest.revenue_yoy||'-'}）、${prev.year_month}は¥${Number(prev.revenue).toLocaleString()}。ADRは¥${Number(latest.adr).toLocaleString()}→¥${Number(prev.adr).toLocaleString()}の推移。データ蓄積に伴い季節変動の把握と価格戦略の精度を高める。`;
+    }
     default: return 'レポート生成中...';
   }
 }
@@ -280,6 +301,204 @@ app.put(`${B}/api/admin/prompts/:type`, auth, admin, (req, res) => {
   db.updatePrompt(req.params.type, req.body.system_prompt);
   if (req.body.clear_cache) db.clearAiReports(null, null);
   res.json({ success: true });
+});
+
+// Admin: Portfolio Report
+app.get(`${B}/api/admin/portfolio`, auth, admin, (req, res) => {
+  res.json(db.getPortfolioSummary());
+});
+app.get(`${B}/api/admin/portfolio/:yearMonth`, auth, admin, (req, res) => {
+  const ym = req.params.yearMonth;
+  const listings = db.getMonthlyDataByMonth(ym);
+  const areas = db.getAreaSummary(ym);
+  const totals = db.getPortfolioSummary().find(r => r.year_month === ym) || {};
+  res.json({ year_month: ym, totals, areas, listings });
+});
+
+// Admin: Portfolio AI Report
+app.get(`${B}/api/admin/portfolio-ai/:yearMonth`, auth, admin, async (req, res) => {
+  const ym = req.params.yearMonth;
+  const cacheKey = 'PORTFOLIO';
+  const cached = db.getAiReport(cacheKey, ym, 'portfolio');
+  if (cached && !req.query.regenerate) return res.json({ content: cached.content, cached: true });
+
+  const portfolio = db.getPortfolioSummary();
+  const curMonth = portfolio.find(r => r.year_month === ym);
+  if (!curMonth) return res.status(404).json({ error: 'データなし' });
+
+  const listings = db.getMonthlyDataByMonth(ym);
+  const areas = db.getAreaSummary(ym);
+  const promptRow = db.getPrompt('portfolio');
+  const userPrompt = promptRow?.system_prompt || db.DEFAULT_PROMPTS.portfolio || '';
+
+  // Build rich data context
+  const yoyPct = (cur, prev) => prev ? ((cur - prev) / prev * 100).toFixed(1) + '%' : '-';
+  let dataStr = `=== ${ym} ポートフォリオ全体 ===\n`;
+  dataStr += `総予約額: ¥${Number(curMonth.total_revenue).toLocaleString()} (前年同月: ${curMonth.yoy_revenue ? '¥'+Number(curMonth.yoy_revenue).toLocaleString() : '不明'}, YoY: ${yoyPct(curMonth.total_revenue, curMonth.yoy_revenue)})\n`;
+  dataStr += `総稼働泊数: ${curMonth.total_nights}泊 (前年同月: ${curMonth.yoy_nights || '不明'}, YoY: ${yoyPct(curMonth.total_nights, curMonth.yoy_nights)})\n`;
+  dataStr += `総予約件数: ${curMonth.total_reservations}件 (前年同月: ${curMonth.yoy_reservations || '不明'}, YoY: ${yoyPct(curMonth.total_reservations, curMonth.yoy_reservations)})\n`;
+  dataStr += `平均ADR: ¥${Number(curMonth.avg_adr).toLocaleString()}\n`;
+  dataStr += `稼働物件: ${curMonth.active_count}/${curMonth.listing_count}\n\n`;
+
+  // Monthly trend
+  dataStr += `=== 月次推移 ===\n`;
+  for (const m of portfolio) {
+    dataStr += `${m.year_month}: ¥${Number(m.total_revenue).toLocaleString()} / ${m.total_nights}泊 / ${m.total_reservations}件 / ADR¥${Number(m.avg_adr).toLocaleString()} / 稼働${m.active_count}件`;
+    if (m.yoy_revenue) dataStr += ` (昨対予約額: ¥${Number(m.yoy_revenue).toLocaleString()}, YoY: ${yoyPct(m.total_revenue, m.yoy_revenue)})`;
+    dataStr += '\n';
+  }
+
+  // Area breakdown
+  dataStr += `\n=== エリア別 ===\n`;
+  for (const a of areas) {
+    const share = (a.total_revenue / (curMonth.total_revenue || 1) * 100).toFixed(1);
+    dataStr += `${a.area}: ¥${Number(a.total_revenue).toLocaleString()} (${share}%) / ${a.total_nights}泊 / ${a.listing_count}物件(稼働${a.active_count}) / ADR¥${Number(a.avg_adr).toLocaleString()}\n`;
+  }
+
+  // Top 10 + Bottom 5 listings
+  dataStr += `\n=== 売上TOP10 ===\n`;
+  listings.slice(0, 10).forEach((l, i) => {
+    const nm = l.nickname || l.title || l.listing_id;
+    dataStr += `${i+1}. ${nm} (${l.area||'-'}): ¥${Number(l.revenue).toLocaleString()} YoY:${l.revenue_yoy||'-'} / ${l.reservations}件 / ${l.booked_nights}泊 / ADR¥${Number(l.adr).toLocaleString()} / 成約${(l.contact_rate*l.booking_rate/100).toFixed(1)}%\n`;
+  });
+  const activeLs = listings.filter(l => l.booked_nights > 0);
+  const bottom5 = activeLs.slice(-5).reverse();
+  dataStr += `\n=== 売上ワースト5 (稼働物件のみ) ===\n`;
+  bottom5.forEach((l, i) => {
+    const nm = l.nickname || l.title || l.listing_id;
+    dataStr += `${i+1}. ${nm}: ¥${Number(l.revenue).toLocaleString()} YoY:${l.revenue_yoy||'-'} / ${l.booked_nights}泊 / ADR¥${Number(l.adr).toLocaleString()}\n`;
+  });
+
+  // YoY decline/growth
+  const declined = listings.filter(l=>l.revenue_yoy&&parseFloat(l.revenue_yoy)<-15).sort((a,b)=>parseFloat(a.revenue_yoy)-parseFloat(b.revenue_yoy));
+  const grown = listings.filter(l=>l.revenue_yoy&&parseFloat(l.revenue_yoy)>30).sort((a,b)=>parseFloat(b.revenue_yoy)-parseFloat(a.revenue_yoy));
+  if (grown.length) { dataStr += `\n=== 成長物件 (YoY+30%以上) ===\n`; grown.slice(0,5).forEach(l => dataStr += `${l.nickname||l.listing_id}: ${l.revenue_yoy}\n`); }
+  if (declined.length) { dataStr += `\n=== 下落物件 (YoY-15%以上) ===\n`; declined.slice(0,5).forEach(l => dataStr += `${l.nickname||l.listing_id}: ${l.revenue_yoy}\n`); }
+
+  try {
+    const systemMsg = `${db.SYSTEM_PROMPT}\n\n${userPrompt}`;
+    const userMsg = `以下のポートフォリオ全体データを分析して、全体レポートを作成してください。500文字程度で、前年比を含めた分析をお願いします。\n\n${dataStr}`;
+    const tmpPrompt = `/tmp/trpreport_portfolio_${Date.now()}.txt`;
+    fs.writeFileSync(tmpPrompt, `${systemMsg}\n\n${userMsg}`);
+    let aiContent = null;
+    try {
+      const raw = execSync(
+        `gsk summarize "${tmpPrompt}" --question "上記のプロンプトとデータに基づいて日本語でポートフォリオ全体レポートを作成してください"`,
+        { encoding: 'utf-8', timeout: 90000 }
+      ).trim();
+      try {
+        const j = JSON.parse(raw);
+        aiContent = j?.data?.result || null;
+        if (aiContent) {
+          const aIdx = aiContent.indexOf('answer:');
+          if (aIdx >= 0) aiContent = aiContent.substring(aIdx + 7).trim();
+          aiContent = aiContent.replace(/\n*Source:.*$/s, '').trim();
+        }
+      } catch (_) {
+        const aIdx = raw.indexOf('answer:');
+        if (aIdx >= 0) aiContent = raw.substring(aIdx + 7).replace(/\n*Source:.*$/s, '').trim();
+        else aiContent = raw;
+      }
+    } catch (e2) { console.error('Portfolio AI error:', e2.message); }
+    try { fs.unlinkSync(tmpPrompt); } catch (_) {}
+
+    if (!aiContent || aiContent.length < 50) {
+      // Template fallback
+      const yoyRevStr = curMonth.yoy_revenue ? `前年同月¥${Number(curMonth.yoy_revenue).toLocaleString()}から${yoyPct(curMonth.total_revenue, curMonth.yoy_revenue)}の変動` : '前年データなし';
+      aiContent = `${ym}の全体予約額は¥${Number(curMonth.total_revenue).toLocaleString()}（${yoyRevStr}）、総稼働${curMonth.total_nights}泊、予約${curMonth.total_reservations}件。平均ADR¥${Number(curMonth.avg_adr).toLocaleString()}。${areas[0]?.area||''}エリアが最大シェアで¥${Number(areas[0]?.total_revenue||0).toLocaleString()}。運営側で各エリアの稼働率向上と価格最適化を進めます。`;
+    }
+    db.saveAiReport(cacheKey, ym, 'portfolio', aiContent);
+    res.json({ content: aiContent, cached: false });
+  } catch (e) {
+    console.error('Portfolio AI error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin: Listings
+app.get(`${B}/api/admin/listings`, auth, admin, (req, res) => res.json(db.listListings()));
+app.put(`${B}/api/admin/listings/:id`, auth, admin, (req, res) => {
+  const { nickname, title, area, airbnb_url, image_url } = req.body;
+  db.updateListing(req.params.id, { nickname, title, area, airbnb_url, image_url });
+  res.json({ success: true });
+});
+
+// Fetch OGP image from Airbnb URL
+app.post(`${B}/api/admin/listings/:id/fetch-image`, auth, admin, async (req, res) => {
+  try {
+    const listing = db.getListing(req.params.id);
+    if (!listing?.airbnb_url) return res.status(400).json({ error: 'Airbnb URLが設定されていません' });
+    const url = listing.airbnb_url;
+    // Fetch HTML and extract og:image
+    const html = execSync(`curl -sL -A "Mozilla/5.0" --max-time 15 "${url}"`, { encoding: 'utf-8', maxBuffer: 5*1024*1024 });
+    const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i)
+      || html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/i);
+    if (!ogMatch) return res.status(404).json({ error: 'OG画像が見つかりませんでした' });
+    const imageUrl = ogMatch[1].replace(/&amp;/g, '&');
+    db.updateListing(req.params.id, { image_url: imageUrl });
+    res.json({ success: true, image_url: imageUrl });
+  } catch (e) {
+    console.error('OGP fetch error:', e.message);
+    res.status(500).json({ error: '画像取得に失敗: ' + e.message.substring(0, 100) });
+  }
+});
+
+
+// ====== Stay Records API ======
+// Import stay data (JSON array)
+app.post(`${B}/api/admin/stay/import`, auth, admin, (req, res) => {
+  try {
+    const { records, year_month } = req.body;
+    if (!records?.length || !year_month) return res.status(400).json({ error: 'records配列とyear_monthが必要' });
+    const count = db.importStayRecords(records, year_month);
+    res.json({ success: true, imported: count });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Get stay months
+app.get(`${B}/api/stay/months`, auth, (req, res) => {
+  res.json(db.getStayMonths());
+});
+
+// Get overall summary for a month
+app.get(`${B}/api/stay/overall/:yearMonth`, auth, (req, res) => {
+  const d = db.getStayOverall(req.params.yearMonth);
+  if (!d) return res.status(404).json({ error: 'データなし' });
+  res.json(d);
+});
+
+// Get per-listing summary
+app.get(`${B}/api/stay/summary/:yearMonth`, auth, (req, res) => {
+  res.json(db.getStaySummaryByListing(req.params.yearMonth));
+});
+
+// Get nationality breakdown
+app.get(`${B}/api/stay/nationality/:yearMonth`, auth, (req, res) => {
+  const lid = req.query.listing_id;
+  res.json(db.getStayNationalitySummary(req.params.yearMonth, lid || null));
+});
+
+// Get records for a specific listing
+app.get(`${B}/api/stay/records/:yearMonth/:listingId`, auth, (req, res) => {
+  res.json(db.getStayRecordsByListing(req.params.listingId, req.params.yearMonth));
+});
+
+// Get all records for a month
+app.get(`${B}/api/stay/records/:yearMonth`, auth, (req, res) => {
+  res.json(db.getStayRecordsByMonth(req.params.yearMonth));
+});
+
+
+// Get nationality grouped by listing
+app.get(`${B}/api/stay/nat-by-listing/:yearMonth`, auth, (req, res) => {
+  const rows = db.getStayNatGroupByListing(req.params.yearMonth);
+  // Group by listing_id
+  const result = {};
+  for (const r of rows) {
+    if (!result[r.listing_id]) result[r.listing_id] = [];
+    result[r.listing_id].push({ nationality: r.nationality, cnt: r.cnt });
+  }
+  res.json(result);
 });
 
 // Init

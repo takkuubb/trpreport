@@ -67,6 +67,9 @@ textarea.inp{min-height:120px;resize:vertical}
 <div id="page-admin-csv" class="page p-4 max-w-2xl mx-auto hidden"></div>
 <div id="page-admin-users" class="page p-4 max-w-2xl mx-auto hidden"></div>
 <div id="page-admin-prompts" class="page p-4 max-w-2xl mx-auto hidden"></div>
+<div id="page-admin-listings" class="page p-4 max-w-3xl mx-auto hidden"></div>
+<div id="page-admin-report" class="page p-4 max-w-4xl mx-auto hidden"></div>
+<div id="page-admin-stay" class="page p-4 max-w-4xl mx-auto hidden"></div>
 
 <nav class="nav-bottom" id="bottomNav"></nav>
 <div id="modal"></div>
@@ -85,7 +88,7 @@ function fmtMoney(v){return '¥'+Number(v||0).toLocaleString('ja-JP',{maximumFra
 
 
 // ===================== ダッシュボード =====================
-let curListing='', curMonth='', curTab='summary', allRange=[];
+let curListing='', curMonth='', curTab='summary', allRange=[], allListingsMap={};
 
 async function loadDashboard(){
   const el=document.getElementById('page-dashboard');
@@ -93,6 +96,7 @@ async function loadDashboard(){
   if(!listings||!months)return;
   if(!curMonth&&months.length)curMonth=months[0];
   if(!curListing&&listings.length)curListing=listings[0].listing_id;
+  allListingsMap={}; listings.forEach(l=>allListingsMap[l.listing_id]=l);
 
   el.innerHTML=`
     <div class="flex gap-3 mb-5 flex-wrap">
@@ -145,7 +149,21 @@ function estViews(d){return d.contact_rate>0?Math.round(d.reservations/(d.contac
 function renderSummary(d,el,range){
   const convRate=(d.contact_rate*d.booking_rate/100).toFixed(1);
   const viewEst=estViews(d);
+  const li=allListingsMap[curListing]||{};
+  const hasImg=li.image_url&&li.image_url.length>10;
+  const hasUrl=li.airbnb_url&&li.airbnb_url.length>10;
+  const listingCard=`
+    <div class="card mb-4 flex gap-4 items-center p-4">
+      ${hasImg?`<img src="${li.image_url}" alt="" class="w-24 h-20 rounded-xl object-cover flex-shrink-0" onerror="this.style.display='none'">`:
+        `<div class="w-24 h-20 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-home text-2xl text-gray-300"></i></div>`}
+      <div class="flex-1 min-w-0">
+        <div class="font-bold text-base truncate">${li.nickname||li.title||curListing}</div>
+        <div class="text-xs text-gray-500 truncate mt-0.5">${li.area||''} · ${curMonth}</div>
+        ${hasUrl?`<a href="${li.airbnb_url}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold" style="color:var(--pri)"><i class="fab fa-airbnb"></i>Airbnbで見る <i class="fas fa-external-link-alt text-[10px]"></i></a>`:''}
+      </div>
+    </div>`;
   el.innerHTML=`
+    ${listingCard}
     <div class="grid grid-cols-2 gap-3 mb-4">
       <div class="kpi-card">
         <div class="kpi-val">${fmtMoney(d.revenue)}</div><div class="kpi-label">月間予約額</div>
@@ -159,7 +177,7 @@ function renderSummary(d,el,range){
       </div>
       <div class="kpi-card">
         <div class="kpi-val">${fmtMoney(d.adr)}</div><div class="kpi-label">ADR (客室単価)</div>
-        <div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div>
+        ${(()=>{ const p=parseFloat((d.adr_yoy||'').replace(/[%,'"]/g,'')); if(!isNaN(p)){const prev=d.adr/(1+p/100); return `<div class="text-xs text-gray-400 mt-0.5">前年 ${fmtMoney(Math.round(prev))}</div><div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div>`} return `<div class="kpi-yoy">-</div>` })()}
         <div class="trend-mini mt-2" id="mt-adr"></div>
       </div>
       <div class="kpi-card">
@@ -218,11 +236,16 @@ function renderDetail(d,el,range){
 
   const thCells=sorted.map(r=>`<th class="px-3 py-2.5 text-center whitespace-nowrap min-w-[100px]">${r.year_month}</th>`).join('');
 
+  // Helper: parse YoY string to number
+  const parseYoy=s=>{if(!s||s==='-')return NaN;return parseFloat(s.replace(/[%,'"]/g,''))};
+  // Helper: calculate prev value from current and YoY%
+  const prevVal=(cur,yoyStr)=>{const p=parseYoy(yoyStr);if(isNaN(p))return null;return cur/(1+p/100);};
+
   let rows='';
   for(const m of metrics){
     // Value row
     rows+=`<tr class="border-b border-gray-100">`;
-    rows+=`<td class="px-3 py-2.5 font-medium text-sm whitespace-nowrap sticky left-0 bg-white z-10 border-r border-gray-100">${m.label}</td>`;
+    rows+=`<td class="px-3 py-2.5 font-medium text-xs whitespace-nowrap sticky left-0 bg-white z-10 border-r border-gray-100">${m.label}</td>`;
     for(const r of sorted){
       let val;
       if(m.key==='_conv'){
@@ -230,12 +253,33 @@ function renderDetail(d,el,range){
       } else {
         val=m.fmt(r[m.key]||0);
       }
-      rows+=`<td class="px-3 py-2.5 text-center text-sm font-semibold">${val}</td>`;
+      rows+=`<td class="px-3 py-2.5 text-center text-xs font-semibold">${val}</td>`;
     }
     rows+=`</tr>`;
-    // YoY row
-    rows+=`<tr class="border-b border-gray-50 bg-gray-50/50">`;
-    rows+=`<td class="px-3 py-1.5 text-xs text-gray-400 sticky left-0 bg-gray-50/80 z-10 border-r border-gray-100">└ 昨対</td>`;
+    // Prev year value row
+    rows+=`<tr class="border-b border-gray-50 bg-gray-50/30">`;
+    rows+=`<td class="px-3 py-1 text-xs text-gray-400 sticky left-0 bg-gray-50/60 z-10 border-r border-gray-100">└ 前年</td>`;
+    for(const r of sorted){
+      let cell='-';
+      if(m.key==='_conv'){
+        cell='-';
+      } else if(m.yoy){
+        const pv=prevVal(r[m.key]||0,r[m.yoy]);
+        if(pv!==null&&!isNaN(pv)){
+          if(m.key==='revenue'||m.key==='adr') cell=fmtMoney(Math.round(pv));
+          else if(m.key==='reservations') cell=Math.round(pv)+'件';
+          else if(m.key==='booked_nights') cell=Math.round(pv)+'泊';
+          else if(m.key==='avg_stay_days'||m.key==='avg_lead_time') cell=pv.toFixed(1)+'日';
+          else if(m.key==='contact_rate') cell=pv.toFixed(2)+'%';
+          else cell=pv.toFixed(1);
+        }
+      }
+      rows+=`<td class="px-3 py-1 text-center text-xs text-gray-500">${cell}</td>`;
+    }
+    rows+=`</tr>`;
+    // YoY % row
+    rows+=`<tr class="border-b border-gray-100 bg-gray-50/50">`;
+    rows+=`<td class="px-3 py-1 text-xs text-gray-400 sticky left-0 bg-gray-50/80 z-10 border-r border-gray-100">└ 昨対</td>`;
     for(const r of sorted){
       let yoyVal='-';
       if(m.key==='_conv'){
@@ -243,7 +287,7 @@ function renderDetail(d,el,range){
       } else if(m.yoy){
         yoyVal=r[m.yoy]||'-';
       }
-      rows+=`<td class="px-3 py-1.5 text-center text-xs font-semibold ${yoyClass(yoyVal)}">${yoyArrow(yoyVal)}</td>`;
+      rows+=`<td class="px-3 py-1 text-center text-xs font-semibold ${yoyClass(yoyVal)}">${yoyVal&&yoyVal!=='-'?yoyArrow(yoyVal):'-'}</td>`;
     }
     rows+=`</tr>`;
   }
@@ -259,7 +303,12 @@ function renderDetail(d,el,range){
           <tbody>${rows}</tbody>
         </table>
       </div>
+    </div>
+    <div class="card mt-4">
+      <h3 class="font-bold text-sm mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-500"></i>詳細分析レポート</h3>
+      <div id="ai-detail" class="ai-report"><div class="text-center py-6"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto mb-2"></div><span class="text-sm text-gray-400">分析中...</span></div></div>
     </div>`;
+  loadAiReport('detail');
 }
 
 // ===================== ファネル =====================
@@ -321,7 +370,7 @@ function renderPricing(d,el,range){
     <div class="grid grid-cols-2 gap-3 mb-4">
       <div class="kpi-card">
         <div class="kpi-val">${fmtMoney(d.adr)}</div><div class="kpi-label">ADR (客室単価)</div>
-        <div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div>
+        ${(()=>{ const p=parseFloat((d.adr_yoy||'').replace(/[%,'"]/g,'')); if(!isNaN(p)){const prev=d.adr/(1+p/100); return `<div class="text-xs text-gray-400 mt-0.5">前年 ${fmtMoney(Math.round(prev))}</div><div class="kpi-yoy ${yoyClass(d.adr_yoy)}">${yoyArrow(d.adr_yoy)}</div>`} return `<div class="kpi-yoy">-</div>` })()}
       </div>
       <div class="kpi-card">
         <div class="kpi-val">${d.avg_lead_time}<span class="text-base ml-0.5">日</span></div><div class="kpi-label">予約リードタイム</div>
@@ -483,7 +532,7 @@ async function delUser(id){if(!confirm('削除しますか？'))return;await api
 // ===================== 管理者: プロンプト =====================
 async function loadAdminPrompts(){
   const prompts=await api('/api/admin/prompts')||[];
-  const LABELS={summary:'サマリー',funnel:'ファネル分析',pricing:'価格戦略',trend:'トレンド分析'};
+  const LABELS={summary:'サマリー',detail:'詳細分析',funnel:'ファネル分析',pricing:'価格戦略',trend:'トレンド分析'};
   const el=document.getElementById('page-admin-prompts');
   el.innerHTML=`
     <h2 class="text-lg font-bold mb-4">AIプロンプト管理</h2>
@@ -501,6 +550,259 @@ async function savePrompt(type,cc){
   const text=document.getElementById('prompt-'+type).value;
   const r=await api('/api/admin/prompts/'+type,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_prompt:text,clear_cache:!!cc})});
   if(r?.success)toast(cc?'保存+キャッシュクリア完了':'保存しました');else toast('エラー');
+}
+
+// ===================== 全体レポート =====================
+let rpMonth='';
+async function loadAdminReport(){
+  const el=document.getElementById('page-admin-report');
+  const months=await api('/api/months');
+  if(!months?.length){el.innerHTML='<p class="text-gray-400 text-center py-12">データがありません</p>';return}
+  if(!rpMonth)rpMonth=months[0];
+  el.innerHTML=`
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-bold">全体レポート</h2>
+      <select id="rpMonthSel" class="inp" style="width:150px" onchange="rpMonth=this.value;renderReport()">
+        ${months.map(m=>`<option value="${m}" ${m===rpMonth?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div id="rpContent"><div class="text-center py-12"><div class="w-8 h-8 border-3 border-gray-200 border-t-pink-500 rounded-full spin mx-auto"></div></div></div>`;
+  renderReport();
+}
+
+async function renderReport(){
+  const c=document.getElementById('rpContent');
+  const [detail, portfolio]=await Promise.all([api('/api/admin/portfolio/'+rpMonth), api('/api/admin/portfolio')]);
+  if(!detail||!detail.totals){c.innerHTML='<p class="text-gray-400 text-center py-8">データなし</p>';return}
+  const t=detail.totals;
+  const curIdx=portfolio.findIndex(p=>p.year_month===rpMonth);
+  const prev=curIdx>=0&&curIdx+1<portfolio.length?portfolio[curIdx+1]:null;
+  const pct=(a,b)=>b?((a-b)/b*100).toFixed(1):'-';
+  const mom=(cur,key)=>prev?pct(cur,prev[key]):'-';
+  const yoyPct=(cur,yoyVal)=>yoyVal?pct(cur,yoyVal):'-';
+
+  // KPI Cards with both MoM and YoY
+  const yoyRevPct=yoyPct(t.total_revenue,t.yoy_revenue);
+  const kpis=`
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="kpi-card"><div class="kpi-val">${fmtMoney(t.total_revenue)}</div><div class="kpi-label">総予約額</div>
+        <div class="text-xs mt-1"><span class="${parseFloat(mom(t.total_revenue,'total_revenue'))>=0?'yoy-up':'yoy-down'} font-semibold">前月 ${mom(t.total_revenue,'total_revenue')}%</span>
+        ${t.yoy_revenue?` <span class="ml-1 ${parseFloat(yoyRevPct)>=0?'yoy-up':'yoy-down'} font-semibold">昨対 ${yoyRevPct}%</span>`:''}</div></div>
+      <div class="kpi-card"><div class="kpi-val">${t.total_nights}<span class="text-base ml-0.5">泊</span></div><div class="kpi-label">総稼働泊数</div>
+        <div class="text-xs mt-1"><span class="${parseFloat(mom(t.total_nights,'total_nights'))>=0?'yoy-up':'yoy-down'} font-semibold">前月 ${mom(t.total_nights,'total_nights')}%</span>
+        ${t.yoy_nights?` <span class="ml-1 ${parseFloat(yoyPct(t.total_nights,t.yoy_nights))>=0?'yoy-up':'yoy-down'} font-semibold">昨対 ${yoyPct(t.total_nights,t.yoy_nights)}%</span>`:''}</div></div>
+      <div class="kpi-card"><div class="kpi-val">${t.total_reservations}<span class="text-base ml-0.5">件</span></div><div class="kpi-label">総予約件数</div>
+        <div class="text-xs mt-1"><span class="${parseFloat(mom(t.total_reservations,'total_reservations'))>=0?'yoy-up':'yoy-down'} font-semibold">前月 ${mom(t.total_reservations,'total_reservations')}%</span>
+        ${t.yoy_reservations?` <span class="ml-1 ${parseFloat(yoyPct(t.total_reservations,t.yoy_reservations))>=0?'yoy-up':'yoy-down'} font-semibold">昨対 ${yoyPct(t.total_reservations,t.yoy_reservations)}%</span>`:''}</div></div>
+      <div class="kpi-card"><div class="kpi-val">${fmtMoney(t.avg_adr)}</div><div class="kpi-label">平均ADR</div>
+        <div class="text-xs text-gray-400 mt-1">稼働${t.active_count}/${t.listing_count}物件</div></div>
+    </div>`;
+
+  // AI Analysis
+  const aiHtml=`
+    <div class="card mb-4" id="rpAiCard">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-7 h-7 rounded-full bg-pink-50 flex items-center justify-center"><i class="fas fa-lightbulb" style="color:var(--pri)"></i></div>
+        <span class="font-bold text-sm">AI分析レポート</span>
+        <button onclick="loadPortfolioAi(true)" class="ml-auto text-xs text-gray-400 hover:text-pink-500" title="再生成"><i class="fas fa-sync-alt"></i></button>
+      </div>
+      <div id="rpAiContent" class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+        <div class="flex items-center gap-2 text-gray-400"><div class="w-4 h-4 border-2 border-gray-200 border-t-pink-500 rounded-full spin"></div>分析中...</div>
+      </div>
+    </div>`;
+
+  // Monthly trend with YoY
+  const trendData=[...portfolio];
+  const trend=`
+    <div class="card mb-4">
+      <h3 class="font-bold text-sm mb-3">月次推移</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs" style="table-layout:fixed">
+          <colgroup><col style="width:72px"><col style="width:100px"><col style="width:64px"><col style="width:60px"><col style="width:64px"><col style="width:52px"><col style="width:80px"><col style="width:52px"></colgroup>
+          <thead><tr class="bg-gray-900 text-white"><th class="px-2 py-2 text-center">月</th><th class="px-2 py-2 text-right">予約額</th><th class="px-2 py-2 text-center">昨対</th><th class="px-2 py-2 text-right">泊数</th><th class="px-2 py-2 text-center">昨対</th><th class="px-2 py-2 text-right">件数</th><th class="px-2 py-2 text-right">ADR</th><th class="px-2 py-2 text-center">稼働</th></tr></thead>
+          <tbody>${trendData.map(r=>{
+            const isCur=r.year_month===rpMonth;
+            const revYoy=r.yoy_revenue?pct(r.total_revenue,r.yoy_revenue):'-';
+            const nightYoy=r.yoy_nights?pct(r.total_nights,r.yoy_nights):'-';
+            return `<tr class="${isCur?'bg-pink-50 font-semibold':'hover:bg-gray-50'} border-b border-gray-100">
+              <td class="px-2 py-2 text-center ${isCur?'text-pink-600':''}">${r.year_month}</td>
+              <td class="px-2 py-2 text-right" style="font-variant-numeric:tabular-nums">${fmtMoney(r.total_revenue)}</td>
+              <td class="px-2 py-2 text-center ${parseFloat(revYoy)>=0?'yoy-up':'yoy-down'}">${revYoy!=='-'?revYoy+'%':'-'}</td>
+              <td class="px-2 py-2 text-right" style="font-variant-numeric:tabular-nums">${r.total_nights}泊</td>
+              <td class="px-2 py-2 text-center ${parseFloat(nightYoy)>=0?'yoy-up':'yoy-down'}">${nightYoy!=='-'?nightYoy+'%':'-'}</td>
+              <td class="px-2 py-2 text-right" style="font-variant-numeric:tabular-nums">${r.total_reservations}件</td>
+              <td class="px-2 py-2 text-right" style="font-variant-numeric:tabular-nums">${fmtMoney(r.avg_adr)}</td>
+              <td class="px-2 py-2 text-center">${r.active_count}/${r.listing_count}</td>
+            </tr>`}).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Area breakdown
+  const areas=detail.areas||[];
+  const totalRev=t.total_revenue||1;
+  const areaHtml=`
+    <div class="card mb-4">
+      <h3 class="font-bold text-sm mb-3">エリア別集計</h3>
+      <div class="space-y-2">
+        ${areas.map(a=>{
+          const share=(a.total_revenue/totalRev*100).toFixed(1);
+          return `<div>
+            <div class="flex justify-between text-xs mb-1"><span class="font-medium">${a.area} <span class="text-gray-400">(${a.active_count}/${a.listing_count}物件)</span></span><span class="font-bold">${fmtMoney(a.total_revenue)} <span class="text-gray-400">${share}%</span></span></div>
+            <div class="h-5 rounded-lg overflow-hidden bg-gray-100"><div class="h-full rounded-lg bg-gradient-to-r from-pink-500 to-rose-400" style="width:${Math.max(2,parseFloat(share))}%"></div></div>
+          </div>`}).join('')}
+      </div>
+    </div>`;
+
+  // Listing ranking table
+  const ls=detail.listings||[];
+  const rankHtml=`
+    <div class="card mb-4 p-0 overflow-hidden">
+      <h3 class="font-bold text-sm px-4 pt-4 pb-2">物件ランキング</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead><tr class="bg-gray-900 text-white">
+            <th class="px-2 py-2 text-left">#</th>
+            <th class="px-2 py-2 text-left">物件名</th>
+            <th class="px-2 py-2 text-left">エリア</th>
+            <th class="px-2 py-2 text-right">予約額</th>
+            <th class="px-2 py-2 text-right">前年比</th>
+            <th class="px-2 py-2 text-right">件数</th>
+            <th class="px-2 py-2 text-right">泊数</th>
+            <th class="px-2 py-2 text-right">ADR</th>
+            <th class="px-2 py-2 text-right">成約率</th>
+          </tr></thead>
+          <tbody>${ls.map((l,i)=>{
+            const name=l.nickname||l.title||l.listing_id;
+            const conv=(l.contact_rate*l.booking_rate/100).toFixed(1);
+            const isZero=!l.revenue||l.revenue===0;
+            return `<tr class="border-b border-gray-100 ${isZero?'bg-red-50/50 text-gray-400':'hover:bg-gray-50'}">
+              <td class="px-2 py-2 font-medium">${i+1}</td>
+              <td class="px-2 py-2 font-medium max-w-[140px] truncate">
+                ${l.image_url?`<img src="${l.image_url}" class="w-6 h-5 rounded inline-block mr-1 object-cover align-middle" onerror="this.style.display='none'">`:''}
+                ${l.airbnb_url?`<a href="${l.airbnb_url}" target="_blank" class="hover:underline" style="color:${isZero?'inherit':'var(--dark)'}">${name}</a>`:name}
+              </td>
+              <td class="px-2 py-2 text-gray-500">${l.area||'-'}</td>
+              <td class="px-2 py-2 text-right font-semibold">${isZero?'-':fmtMoney(l.revenue)}</td>
+              <td class="px-2 py-2 text-right ${yoyClass(l.revenue_yoy)}">${l.revenue_yoy?yoyArrow(l.revenue_yoy):'-'}</td>
+              <td class="px-2 py-2 text-right">${l.reservations||0}</td>
+              <td class="px-2 py-2 text-right">${l.booked_nights||0}</td>
+              <td class="px-2 py-2 text-right">${isZero?'-':fmtMoney(l.adr)}</td>
+              <td class="px-2 py-2 text-right">${isZero?'-':conv+'%'}</td>
+            </tr>`}).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Monthly revenue chart
+  const chartHtml=`<div class="card mb-4"><canvas id="rpChart" height="200"></canvas></div>`;
+
+  c.innerHTML=kpis+aiHtml+chartHtml+trend+areaHtml+rankHtml;
+
+  // Draw chart (chronological order for chart)
+  const chartData=[...trendData].reverse();
+  if(chartData.length>1){
+    new Chart(document.getElementById('rpChart'),{type:'bar',data:{
+      labels:chartData.map(r=>r.year_month),
+      datasets:[{
+        label:'予約額 (万)',data:chartData.map(r=>Math.round(r.total_revenue/10000)),
+        backgroundColor:chartData.map(r=>r.year_month===rpMonth?'#FF385C':'#FFB8C6'),
+        borderRadius:8,barPercentage:.6
+      },{
+        label:'稼働泊数',data:chartData.map(r=>r.total_nights),
+        type:'line',borderColor:'#222',pointBackgroundColor:'#222',
+        tension:.4,pointRadius:4,yAxisID:'y2'
+      }]
+    },options:{responsive:true,plugins:{legend:{labels:{usePointStyle:true,padding:16}}},scales:{y:{beginAtZero:true,title:{display:true,text:'予約額(万円)'},grid:{color:'#f3f3f3'}},y2:{position:'right',beginAtZero:true,title:{display:true,text:'泊数'},grid:{drawOnChartArea:false}}}}});
+  }
+  // Load AI async
+  loadPortfolioAi(false);
+}
+
+async function loadPortfolioAi(regen){
+  const el=document.getElementById('rpAiContent');
+  if(!el)return;
+  el.innerHTML='<div class="flex items-center gap-2 text-gray-400"><div class="w-4 h-4 border-2 border-gray-200 border-t-pink-500 rounded-full spin"></div>'+(regen?'再生成中...':'分析中...')+'</div>';
+  const url='/api/admin/portfolio-ai/'+rpMonth+(regen?'?regenerate=1':'');
+  const r=await api(url);
+  if(r?.content) el.textContent=r.content;
+  else el.innerHTML='<span class="text-gray-400">レポートを取得できませんでした</span>';
+}
+
+// ===================== 物件管理 =====================
+async function loadAdminListings(){
+  const listings=await api('/api/admin/listings')||[];
+  const el=document.getElementById('page-admin-listings');
+  el.innerHTML=`
+    <h2 class="text-lg font-bold mb-4">宿泊施設管理</h2>
+    <p class="text-sm text-gray-500 mb-4">施設名やAirbnb URLを設定してください。URLから自動でサムネイル画像を取得できます。</p>
+    <div class="space-y-3">
+    ${listings.map(l=>`
+      <div class="card p-4">
+        <div class="flex gap-3 items-start">
+          ${l.image_url?`<img src="${l.image_url}" class="w-16 h-14 rounded-lg object-cover flex-shrink-0" onerror="this.style.display='none'">`
+            :`<div class="w-16 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-home text-gray-300"></i></div>`}
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-sm truncate">${l.nickname||l.title||l.listing_id}</div>
+            <div class="text-xs text-gray-400 truncate">ID: ${l.listing_id} · ${l.area||'未設定'}</div>
+            ${l.airbnb_url?`<a href="${l.airbnb_url}" target="_blank" class="text-xs mt-1 inline-block truncate max-w-full" style="color:var(--pri)">${l.airbnb_url.substring(0,50)}...</a>`:''}
+          </div>
+          <button onclick="showEditListing('${l.listing_id}')" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 flex-shrink-0"><i class="fas fa-edit text-xs"></i></button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+}
+
+function showEditListing(lid){
+  api('/api/admin/listings').then(listings=>{
+    const l=listings?.find(x=>x.listing_id===lid);if(!l)return;
+    document.getElementById('modal').innerHTML=`
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">物件編集</h3>
+      <div class="space-y-3">
+        <div><label class="text-xs font-medium text-gray-500">リスティングID</label><input type="text" class="inp bg-gray-50" value="${l.listing_id}" readonly></div>
+        <div><label class="text-xs font-medium text-gray-500">施設名 (ニックネーム)</label><input type="text" id="elNick" class="inp" value="${l.nickname||''}"></div>
+        <div><label class="text-xs font-medium text-gray-500">タイトル</label><input type="text" id="elTitle" class="inp" value="${(l.title||'').replace(/"/g,'&quot;')}"></div>
+        <div><label class="text-xs font-medium text-gray-500">エリア</label><input type="text" id="elArea" class="inp" value="${l.area||''}"></div>
+        <div><label class="text-xs font-medium text-gray-500">Airbnb URL</label><input type="url" id="elUrl" class="inp" value="${l.airbnb_url||('https://www.airbnb.jp/rooms/'+l.listing_id)}" placeholder="https://www.airbnb.jp/rooms/..."></div>
+        <div>
+          <label class="text-xs font-medium text-gray-500">サムネイル画像</label>
+          <div class="flex gap-2 items-end">
+            <input type="text" id="elImg" class="inp flex-1" value="${l.image_url||''}" placeholder="自動取得または手動入力">
+            <button onclick="fetchOgImage('${l.listing_id}')" id="btnFetchImg" class="btn btn-o btn-sm flex-shrink-0"><i class="fas fa-magic mr-1"></i>自動取得</button>
+          </div>
+          ${l.image_url?`<img src="${l.image_url}" class="w-full h-32 rounded-xl object-cover mt-2" onerror="this.style.display='none'">`:''}
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button onclick="closeModal()" class="btn btn-o flex-1">キャンセル</button>
+        <button onclick="saveListing('${l.listing_id}')" class="btn btn-p flex-1">保存</button>
+      </div>
+    </div></div>`;
+  });
+}
+
+async function saveListing(lid){
+  const body={nickname:document.getElementById('elNick').value.trim(),title:document.getElementById('elTitle').value.trim(),area:document.getElementById('elArea').value.trim(),airbnb_url:document.getElementById('elUrl').value.trim(),image_url:document.getElementById('elImg').value.trim()};
+  const r=await api('/api/admin/listings/'+encodeURIComponent(lid),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r?.success){closeModal();toast('保存しました');loadAdminListings()}else toast(r?.error||'エラー');
+}
+
+async function fetchOgImage(lid){
+  const btn=document.getElementById('btnFetchImg');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner spin mr-1"></i>取得中...';
+  // Save URL first
+  const url=document.getElementById('elUrl').value.trim();
+  if(url) await api('/api/admin/listings/'+encodeURIComponent(lid),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({airbnb_url:url})});
+  const r=await api('/api/admin/listings/'+encodeURIComponent(lid)+'/fetch-image',{method:'POST'});
+  if(r?.success){
+    document.getElementById('elImg').value=r.image_url;
+    toast('画像取得完了 ✅');
+    showEditListing(lid); // refresh modal
+  } else toast(r?.error||'取得失敗');
+  btn.disabled=false;btn.innerHTML='<i class="fas fa-magic mr-1"></i>自動取得';
 }
 
 // ===================== 設定 =====================
@@ -547,6 +849,223 @@ async function regPasskey(){
   }catch(e){if(e.name==='NotAllowedError')toast('キャンセル');else toast(e.message)}
 }
 
+// ===================== 宿泊実績 =====================
+let stayMonth='';
+let stayData={};
+async function loadStay(){
+  const el=document.getElementById('page-admin-stay');
+  el.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
+  try{
+    const months=await api('stay/months');
+    if(!months.length){el.innerHTML='<div class="card text-center text-gray-500">宿泊実績データがありません</div>';return}
+    if(!stayMonth)stayMonth=months[0];
+    // Month selector + content
+    el.innerHTML=`
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold">宿泊実績レポート</h2>
+      <select id="stayMonthSel" class="inp" style="width:auto;min-height:36px;padding:6px 12px" onchange="stayMonth=this.value;renderStay()">
+        ${months.map(m=>`<option value="${m}" ${m===stayMonth?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div id="stayContent"></div>`;
+    await renderStay();
+  }catch(e){el.innerHTML=`<div class="card text-red-500">${e.message}</div>`}
+}
+
+async function renderStay(){
+  const ct=document.getElementById('stayContent');
+  ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
+  const [overall,summary,nationality]=await Promise.all([
+    api('stay/overall/'+stayMonth),
+    api('stay/summary/'+stayMonth),
+    api('stay/nationality/'+stayMonth)
+  ]);
+  stayData={overall,summary,nationality};
+  let h='';
+  // KPI cards
+  const o=overall;
+  h+=`<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+    <div class="kpi-card"><div class="kpi-val">${o.booking_count}</div><div class="kpi-label">予約件数</div></div>
+    <div class="kpi-card"><div class="kpi-val">${o.listing_count}</div><div class="kpi-label">施設数</div></div>
+    <div class="kpi-card"><div class="kpi-val">${o.total_nights||0}</div><div class="kpi-label">総泊数</div></div>
+    <div class="kpi-card"><div class="kpi-val">${o.total_guests||0}</div><div class="kpi-label">ゲスト合計</div></div>
+  </div>`;
+  h+=`<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+    <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(o.total_amount)}</div><div class="kpi-label">金額合計</div></div>
+    <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(o.total_net_revenue)}</div><div class="kpi-label">純売上合計</div></div>
+    <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(o.total_owner_revenue)}</div><div class="kpi-label">オーナー収益合計</div></div>
+    <div class="kpi-card"><div class="kpi-val text-lg">¥${Number(o.avg_nightly_rate||0).toLocaleString()}</div><div class="kpi-label">平均泊単価</div></div>
+  </div>`;
+
+  // Nationality chart
+  h+=`<div class="card"><h3 class="font-bold text-sm mb-3"><i class="fas fa-globe mr-1" style="color:var(--pri)"></i>国籍構成</h3>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div><canvas id="natChart" height="200"></canvas></div>
+    <div class="text-xs space-y-1" id="natList"></div>
+  </div></div>`;
+
+  // Per-listing cards
+  h+=`<h3 class="font-bold text-sm mt-4 mb-3"><i class="fas fa-building mr-1" style="color:var(--pri)"></i>施設別宿泊実績</h3>`;
+  for(const s of summary){
+    const intlRate=s.booking_count>0?Math.round(((s.booking_count-(stayData.nationality||[]).filter(n=>n.nationality==='Japan').reduce((a,c)=>a,0))/s.booking_count)*100):0;
+    h+=`<div class="card cursor-pointer" onclick="showStayDetail('${s.listing_id}')">
+      <div class="flex items-center gap-3 mb-3">
+        ${s.image_url?`<img src="${s.image_url}" class="w-14 h-14 rounded-xl object-cover flex-shrink-0">`:''}
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm truncate">${s.nickname||s.title||s.listing_id}</div>
+          <div class="text-xs text-gray-400">${s.area||''} · ${s.booking_count}件 · ${s.total_nights}泊 · ${s.total_guests}名</div>
+        </div>
+        <i class="fas fa-chevron-right text-gray-300"></i>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center text-xs">
+        <div><div class="font-bold text-sm">${fmtMoney(s.total_amount)}</div><div class="text-gray-400">金額</div></div>
+        <div><div class="font-bold text-sm">${fmtMoney(s.total_net_revenue)}</div><div class="text-gray-400">純売上</div></div>
+        <div><div class="font-bold text-sm">${fmtMoney(s.total_owner_revenue)}</div><div class="text-gray-400">オーナー収益</div></div>
+      </div>
+    </div>`;
+  }
+
+  // === 施設間比較テーブル (管理者向け) ===
+  const natByListing=await api('stay/nat-by-listing/'+stayMonth);
+  h+=`<h3 class="font-bold text-sm mt-4 mb-3"><i class="fas fa-table mr-1" style="color:var(--pri)"></i>施設間比較一覧</h3>`;
+  h+=`<div class="card overflow-x-auto"><table class="w-full text-xs" style="min-width:1050px;table-layout:fixed"><colgroup>
+  <col style="width:140px"><col style="width:50px"><col style="width:50px"><col style="width:55px">
+  <col style="width:75px"><col style="width:90px"><col style="width:90px"><col style="width:90px">
+  <col style="width:65px"><col style="width:50px"></colgroup>
+  <thead class="bg-gray-50"><tr>
+  <th class="px-2 py-2 text-left">施設名</th><th class="px-2 py-2 text-right">件数</th><th class="px-2 py-2 text-right">泊数</th>
+  <th class="px-2 py-2 text-right">ゲスト</th><th class="px-2 py-2 text-right">泊単価</th>
+  <th class="px-2 py-2 text-right">金額合計</th><th class="px-2 py-2 text-right">純売上</th>
+  <th class="px-2 py-2 text-right">ｵｰﾅｰ収益</th><th class="px-2 py-2 text-right">国際率</th>
+  <th class="px-2 py-2 text-right">人/件</th></tr></thead><tbody>`;
+  for(const s of summary){
+    const lNats=natByListing[s.listing_id]||[];
+    const jpCnt=lNats.filter(n=>n.nationality.startsWith('Japan')).reduce((a,c)=>a+c.cnt,0);
+    const intlPct=s.booking_count>0?Math.round((s.booking_count-jpCnt)/s.booking_count*100):0;
+    const gPerB=s.booking_count>0?(s.total_guests/s.booking_count).toFixed(1):'0';
+    h+=`<tr class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onclick="showStayDetail('${s.listing_id}')">
+      <td class="px-2 py-2 font-medium truncate">${s.nickname||s.title||s.listing_id}</td>
+      <td class="px-2 py-2 text-right">${s.booking_count}</td>
+      <td class="px-2 py-2 text-right">${s.total_nights}</td>
+      <td class="px-2 py-2 text-right">${s.total_guests}</td>
+      <td class="px-2 py-2 text-right font-variant-numeric:tabular-nums">¥${Number(s.nightly_rate||0).toLocaleString()}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(s.total_amount)}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(s.total_net_revenue)}</td>
+      <td class="px-2 py-2 text-right font-bold" style="color:var(--green)">${fmtMoney(s.total_owner_revenue)}</td>
+      <td class="px-2 py-2 text-right"><span class="px-2 py-0.5 rounded-full text-xs ${intlPct>50?'bg-pink-100 text-pink-700':'bg-gray-100'}">${intlPct}%</span></td>
+      <td class="px-2 py-2 text-right">${gPerB}</td>
+    </tr>`;
+  }
+  h+=`<tr class="bg-gray-50 font-bold"><td class="px-2 py-2">合計 (${summary.length}施設)</td>
+    <td class="px-2 py-2 text-right">${o.booking_count}</td>
+    <td class="px-2 py-2 text-right">${o.total_nights}</td>
+    <td class="px-2 py-2 text-right">${o.total_guests}</td>
+    <td class="px-2 py-2 text-right">¥${Number(o.avg_nightly_rate||0).toLocaleString()}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(o.total_amount)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(o.total_net_revenue)}</td>
+    <td class="px-2 py-2 text-right" style="color:var(--green)">${fmtMoney(o.total_owner_revenue)}</td>
+    <td class="px-2 py-2 text-right"></td>
+    <td class="px-2 py-2 text-right">${o.avg_guests_per_booking}</td>
+  </tr>`;
+  h+=`</tbody></table></div>`;
+
+  ct.innerHTML=h;
+
+  // Render nationality chart
+  renderNatChart(nationality);
+}
+
+function renderNatChart(data){
+  const colors=['#FF385C','#00A699','#FC642D','#484848','#767676','#008489','#FF5A5F','#FFB400','#914669','#61C0BF','#ECC94B','#38B2AC'];
+  const labels=data.map(d=>d.nationality);
+  const vals=data.map(d=>d.cnt);
+  const total=vals.reduce((a,b)=>a+b,0);
+  const canvas=document.getElementById('natChart');
+  if(!canvas)return;
+  new Chart(canvas,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:colors.slice(0,labels.length),borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false}}}});
+  const list=document.getElementById('natList');
+  if(list)list.innerHTML=data.map((d,i)=>{
+    const pct=(d.cnt/total*100).toFixed(1);
+    return `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i%colors.length]}"></span><span class="flex-1">${d.nationality}</span><span class="font-bold">${d.cnt}件 (${pct}%)</span><span class="text-gray-400">${d.guests}名</span></div>`;
+  }).join('');
+}
+
+async function showStayDetail(lid){
+  const ct=document.getElementById('stayContent');
+  ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
+  const [records,natData]=await Promise.all([
+    api(`stay/records/${stayMonth}/${lid}`),
+    api(`stay/nationality/${stayMonth}?listing_id=${lid}`)
+  ]);
+  const listing=stayData.summary?.find(s=>s.listing_id===lid)||{};
+  let h=`<button onclick="renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
+  h+=`<div class="card">
+    <div class="flex items-center gap-3 mb-4">
+      ${listing.image_url?`<img src="${listing.image_url}" class="w-16 h-16 rounded-xl object-cover">`:''}
+      <div><div class="font-bold text-base">${listing.nickname||listing.title||lid}</div>
+      <div class="text-xs text-gray-400">${listing.area||''} · ${records.length}件 · ${listing.total_nights||0}泊</div></div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_amount)}</div><div class="kpi-label">金額合計</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_net_revenue)}</div><div class="kpi-label">純売上</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_mgmt_fee)}</div><div class="kpi-label">運営代行手数料</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_owner_revenue)}</div><div class="kpi-label">オーナー様収益</div></div>
+    </div>
+  </div>`;
+
+  // Nationality mini
+  if(natData.length){
+    h+=`<div class="card"><h4 class="font-bold text-xs mb-2">国籍構成</h4><div class="flex flex-wrap gap-2">`;
+    const total=natData.reduce((a,c)=>a+c.cnt,0);
+    for(const n of natData){
+      const pct=(n.cnt/total*100).toFixed(0);
+      h+=`<span class="text-xs bg-gray-100 rounded-full px-3 py-1">${n.nationality} ${n.cnt}件(${pct}%) ${n.adults}A/${n.children}C/${n.infants}I</span>`;
+    }
+    h+=`</div></div>`;
+  }
+
+  // Records table
+  h+=`<div class="card overflow-x-auto"><h4 class="font-bold text-xs mb-3">明細一覧</h4>
+  <table class="w-full text-xs" style="min-width:900px"><thead class="bg-gray-50">
+  <tr><th class="px-2 py-2 text-left">日付</th><th class="px-2 py-2 text-right">泊</th><th class="px-2 py-2 text-left">ゲスト</th>
+  <th class="px-2 py-2 text-right">金額</th><th class="px-2 py-2 text-right">手数料</th><th class="px-2 py-2 text-right">清掃料</th>
+  <th class="px-2 py-2 text-right">総売上</th><th class="px-2 py-2 text-right">清掃代行</th><th class="px-2 py-2 text-right">純売上</th>
+  <th class="px-2 py-2 text-right">代行費</th><th class="px-2 py-2 text-right">オーナー収益</th><th class="px-2 py-2 text-left">確認コード</th></tr></thead><tbody>`;
+  let totals={amount:0,svc:0,clean:0,rev:0,co:0,net:0,mgmt:0,own:0};
+  for(const r of records){
+    totals.amount+=r.amount;totals.svc+=r.service_fee;totals.clean+=r.cleaning_fee;
+    totals.rev+=r.total_revenue;totals.co+=r.cleaning_outsource;totals.net+=r.net_revenue;
+    totals.mgmt+=r.mgmt_fee;totals.own+=r.owner_revenue;
+    const gInfo=r.total_guests?` (${r.adults}A${r.children?'/'+r.children+'C':''}${r.infants?'/'+r.infants+'I':''})`:' ';
+    h+=`<tr class="border-b border-gray-100 hover:bg-gray-50">
+      <td class="px-2 py-2 whitespace-nowrap">${r.start_date}</td>
+      <td class="px-2 py-2 text-right">${r.nights}</td>
+      <td class="px-2 py-2"><div class="truncate max-w-[120px]" title="${r.guest_name}">${r.guest_name}</div><div class="text-gray-400">${r.nationality}${gInfo}</div></td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.amount)}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.service_fee)}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.cleaning_fee)}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.total_revenue)}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.cleaning_outsource)}</td>
+      <td class="px-2 py-2 text-right font-bold">${fmtMoney(r.net_revenue)}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.mgmt_fee)}</td>
+      <td class="px-2 py-2 text-right font-bold" style="color:var(--green)">${fmtMoney(r.owner_revenue)}</td>
+      <td class="px-2 py-2 font-mono text-gray-400">${r.confirmation_code}</td>
+    </tr>`;
+  }
+  h+=`<tr class="bg-gray-50 font-bold"><td class="px-2 py-2" colspan="3">合計 (${records.length}件)</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.amount)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.svc)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.clean)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.rev)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.co)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.net)}</td>
+    <td class="px-2 py-2 text-right">${fmtMoney(totals.mgmt)}</td>
+    <td class="px-2 py-2 text-right" style="color:var(--green)">${fmtMoney(totals.own)}</td>
+    <td class="px-2 py-2"></td></tr>`;
+  h+=`</tbody></table></div>`;
+  ct.innerHTML=h;
+}
+
 // ===================== ナビ + 初期化 =====================
 function buildNav(){
   const nav=document.getElementById('bottomNav');
@@ -554,7 +1073,10 @@ function buildNav(){
   if(user.role==='admin'){
     items=[
       {page:'dashboard',icon:'fa-chart-pie',label:'レポート',load:loadDashboard},
+      {page:'admin-report',icon:'fa-chart-bar',label:'全体',load:loadAdminReport},
+      {page:'admin-stay',icon:'fa-bed',label:'宿泊',load:loadStay},
       {page:'admin-csv',icon:'fa-file-csv',label:'CSV',load:loadAdminCsv},
+      {page:'admin-listings',icon:'fa-building',label:'物件',load:loadAdminListings},
       {page:'admin-users',icon:'fa-users',label:'アカウント',load:loadAdminUsers},
       {page:'admin-prompts',icon:'fa-wand-magic-sparkles',label:'プロンプト',load:loadAdminPrompts}
     ];
