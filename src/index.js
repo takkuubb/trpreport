@@ -16,8 +16,9 @@ const upload = multer({ dest: '/tmp/trpreport_uploads/' });
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.set('trust proxy', 1);
 app.use(session({
-  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+  secret: process.env.SESSION_SECRET || 'trpreport-session-secret-2026',
   resave: false, saveUninitialized: false,
   cookie: { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax' }
 }));

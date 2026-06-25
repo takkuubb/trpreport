@@ -78,7 +78,7 @@ textarea.inp{min-height:120px;resize:vertical}
 const B='/trpreport';
 let user=null;
 
-async function api(p,o){const r=await fetch(B+p,o);if(r.status===401){location.href=B+'/login';return null}return r.json()}
+async function api(p,o){const r=await fetch(B+p,o);if(r.status===401||r.redirected){location.href=B+'/login';return null}const ct=r.headers.get('content-type')||'';if(!ct.includes('json')){console.error('Non-JSON:',r.url);location.href=B+'/login';return null}return r.json()}
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
 function closeModal(){document.getElementById('modal').innerHTML=''}
 function showPage(p){document.querySelectorAll('.page').forEach(el=>el.classList.add('hidden'));const pg=document.getElementById('page-'+p);if(pg)pg.classList.remove('hidden');document.querySelectorAll('#bottomNav .nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===p))}
@@ -856,7 +856,7 @@ async function loadStay(){
   const el=document.getElementById('page-admin-stay');
   el.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
   try{
-    const months=await api('stay/months');
+    const months=await api('/api/stay/months');
     if(!months.length){el.innerHTML='<div class="card text-center text-gray-500">宿泊実績データがありません</div>';return}
     if(!stayMonth)stayMonth=months[0];
     // Month selector + content
@@ -876,9 +876,9 @@ async function renderStay(){
   const ct=document.getElementById('stayContent');
   ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
   const [overall,summary,nationality]=await Promise.all([
-    api('stay/overall/'+stayMonth),
-    api('stay/summary/'+stayMonth),
-    api('stay/nationality/'+stayMonth)
+    api('/api/stay/overall/'+stayMonth),
+    api('/api/stay/summary/'+stayMonth),
+    api('/api/stay/nationality/'+stayMonth)
   ]);
   stayData={overall,summary,nationality};
   let h='';
@@ -926,7 +926,7 @@ async function renderStay(){
   }
 
   // === 施設間比較テーブル (管理者向け) ===
-  const natByListing=await api('stay/nat-by-listing/'+stayMonth);
+  const natByListing=await api('/api/stay/nat-by-listing/'+stayMonth);
   h+=`<h3 class="font-bold text-sm mt-4 mb-3"><i class="fas fa-table mr-1" style="color:var(--pri)"></i>施設間比較一覧</h3>`;
   h+=`<div class="card overflow-x-auto"><table class="w-full text-xs" style="min-width:1050px;table-layout:fixed"><colgroup>
   <col style="width:140px"><col style="width:50px"><col style="width:50px"><col style="width:55px">
@@ -994,8 +994,8 @@ async function showStayDetail(lid){
   const ct=document.getElementById('stayContent');
   ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
   const [records,natData]=await Promise.all([
-    api(`stay/records/${stayMonth}/${lid}`),
-    api(`stay/nationality/${stayMonth}?listing_id=${lid}`)
+    api(`/api/stay/records/${stayMonth}/${lid}`),
+    api(`/api/stay/nationality/${stayMonth}?listing_id=${lid}`)
   ]);
   const listing=stayData.summary?.find(s=>s.listing_id===lid)||{};
   let h=`<button onclick="renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
