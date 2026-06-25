@@ -1126,9 +1126,9 @@ function buildNav(){
   let items=[];
   if(user.role==='admin'){
     items=[
-      {page:'dashboard',icon:'fa-calendar-check',label:'レポート',load:loadDashboard},
+      {page:'dashboard',icon:'fa-calendar-check',label:'予約実績',load:loadDashboard},
       {page:'admin-report',icon:'fa-chart-bar',label:'全体',load:loadAdminReport},
-      {page:'admin-stay',icon:'fa-bed',label:'宿泊',load:loadStay},
+      {page:'admin-stay',icon:'fa-bed',label:'宿泊実績',load:loadStay},
       {page:'admin-csv',icon:'fa-file-csv',label:'CSV',load:loadAdminCsv},
       {page:'admin-listings',icon:'fa-building',label:'物件',load:loadAdminListings},
       {page:'admin-users',icon:'fa-users',label:'アカウント',load:loadAdminUsers},
@@ -1136,8 +1136,8 @@ function buildNav(){
     ];
   }else{
     items=[
-      {page:'dashboard',icon:'fa-calendar-check',label:'レポート',load:loadDashboard},
-      {page:'admin-stay',icon:'fa-bed',label:'宿泊',load:loadStay}
+      {page:'dashboard',icon:'fa-calendar-check',label:'予約実績',load:loadDashboard},
+      {page:'admin-stay',icon:'fa-bed',label:'宿泊実績',load:loadStay}
     ];
   }
   nav.innerHTML=items.map(it=>`<div class="nav-item" data-page="${it.page}" onclick="navTo('${it.page}')"><i class="fas ${it.icon}"></i><span>${it.label}</span></div>`).join('');
