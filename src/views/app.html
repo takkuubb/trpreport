@@ -946,17 +946,19 @@ async function renderStay(){
   let h='';
   // KPI cards
   const o=overall;
-  h+=`<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-    <div class="kpi-card"><div class="kpi-val">${o.booking_count}</div><div class="kpi-label">予約件数</div></div>
-    <div class="kpi-card"><div class="kpi-val">${o.listing_count}</div><div class="kpi-label">施設数</div></div>
-    <div class="kpi-card"><div class="kpi-val">${o.total_nights||0}</div><div class="kpi-label">総泊数</div></div>
-    <div class="kpi-card"><div class="kpi-val">${o.total_guests||0}</div><div class="kpi-label">ゲスト合計</div></div>
+  const avgStay=o.booking_count>0?(o.total_nights/o.booking_count).toFixed(1):'0';
+  h+=`<div class="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
+    <div class="kpi-card"><div class="kpi-val">${o.booking_count}<span class="text-base ml-0.5">件</span></div><div class="kpi-label">予約件数</div></div>
+    <div class="kpi-card"><div class="kpi-val">${o.total_nights||0}<span class="text-base ml-0.5">泊</span></div><div class="kpi-label">総泊数</div></div>
+    <div class="kpi-card"><div class="kpi-val">${avgStay}<span class="text-base ml-0.5">泊</span></div><div class="kpi-label">平均泊数</div></div>
+    <div class="kpi-card"><div class="kpi-val">${o.total_guests||0}<span class="text-base ml-0.5">名</span></div><div class="kpi-label">ゲスト合計</div></div>
+    <div class="kpi-card"><div class="kpi-val">¥${Number(o.avg_nightly_rate||0).toLocaleString()}</div><div class="kpi-label">平均宿泊単価</div></div>
   </div>`;
   h+=`<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
     <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(o.total_amount)}</div><div class="kpi-label">金額合計</div></div>
     <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(o.total_net_revenue)}</div><div class="kpi-label">純売上合計</div></div>
     <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(o.total_owner_revenue)}</div><div class="kpi-label">オーナー収益合計</div></div>
-    <div class="kpi-card"><div class="kpi-val text-lg">¥${Number(o.avg_nightly_rate||0).toLocaleString()}</div><div class="kpi-label">平均泊単価</div></div>
+    <div class="kpi-card"><div class="kpi-val text-lg">${o.listing_count}<span class="text-base ml-0.5">施設</span></div><div class="kpi-label">施設数</div></div>
   </div>`;
 
   // Nationality chart
