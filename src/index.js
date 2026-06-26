@@ -1,3 +1,4 @@
+try { require('dotenv').config(); } catch(_) {}
 const express = require('express');
 const session = require('express-session');
 const crypto = require('crypto');
@@ -288,6 +289,42 @@ app.post(`${B}/api/admin/stay-csv`, auth, admin, upload.array('files', 20), (req
         try { fs.unlinkSync(file.path); } catch {}
       }
     }
+    // Trigger background enrichment (nationality + guest count)
+    const anySuccess = results.some(r => r.success && r.imported > 0);
+    if (anySuccess) {
+      const ym = yearMonth;
+      setTimeout(() => {
+        try {
+          const recs = db.getDb().prepare(`SELECT confirmation_code, guest_name,
+            CASE WHEN nationality='Unknown' THEN 1 ELSE 0 END as needs_nationality,
+            CASE WHEN total_guests=0 AND confirmation_code NOT LIKE 'ADJ-%' THEN 1 ELSE 0 END as needs_guests
+            FROM stay_records WHERE year_month=? AND (nationality='Unknown' OR total_guests=0)`).all(ym);
+          if (recs.length === 0) return;
+          const input = JSON.stringify(recs);
+          const tmpIn = `/tmp/enrich_input_${Date.now()}.json`;
+          fs.writeFileSync(tmpIn, input);
+          const enrichScript = path.join(__dirname, 'enrich_stay.py');
+          execSync(`python3 "${enrichScript}" "${ym}" < "${tmpIn}" > /tmp/enrich_result_${ym}.json 2>/tmp/enrich_log_${ym}.txt`, { timeout: 600000, env: { ...process.env } });
+          const result = JSON.parse(fs.readFileSync(`/tmp/enrich_result_${ym}.json`, 'utf-8'));
+          if (result.nationality?.length) {
+            const natStmt = db.getDb().prepare("UPDATE stay_records SET nationality=? WHERE confirmation_code=? AND nationality='Unknown'");
+            db.getDb().transaction(() => {
+              for (const r of result.nationality) natStmt.run(r.nationality, r.confirmation_code);
+            })();
+            console.log(`Enriched ${result.nationality.length} nationalities for ${ym}`);
+          }
+          if (result.guests?.length) {
+            const gStmt = db.getDb().prepare('UPDATE stay_records SET adults=?, children=?, infants=?, total_guests=? WHERE confirmation_code=? AND total_guests=0');
+            db.getDb().transaction(() => {
+              for (const r of result.guests) gStmt.run(r.adults, r.children, r.infants, r.total_guests, r.confirmation_code);
+            })();
+            console.log(`Enriched ${result.guests.length} guest counts for ${ym}`);
+          }
+          try { fs.unlinkSync(tmpIn); } catch {}
+        } catch (e) { console.error('Enrichment error:', e.message); }
+      }, 2000);
+    }
+
     res.json({ results });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
