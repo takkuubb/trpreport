@@ -270,6 +270,29 @@ app.post(`${B}/api/admin/csv`, auth, admin, upload.array('files', 20), (req, res
 
 app.get(`${B}/api/admin/uploads`, auth, admin, (req, res) => res.json(db.listUploads()));
 
+// Admin: Stay (payout) CSV Upload
+app.post(`${B}/api/admin/stay-csv`, auth, admin, upload.array('files', 20), (req, res) => {
+  try {
+    const yearMonth = req.body.yearMonth;
+    if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) return res.status(400).json({ error: '年月をYYYY-MM形式で指定してください' });
+    if (!req.files?.length) return res.status(400).json({ error: 'ファイルを選択してください' });
+    const results = [];
+    for (const file of req.files) {
+      try {
+        const content = fs.readFileSync(file.path, 'utf-8');
+        const r = db.importStayCSV(content, yearMonth, req.session.user.id, file.originalname);
+        results.push({ file: file.originalname, ...r, success: true });
+      } catch (e) {
+        results.push({ file: file.originalname, error: e.message, success: false });
+      } finally {
+        try { fs.unlinkSync(file.path); } catch {}
+      }
+    }
+    res.json({ results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 // Admin: Users
 app.get(`${B}/api/admin/users`, auth, admin, (req, res) => {
   const users = db.listUsers().map(u => {

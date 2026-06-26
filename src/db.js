@@ -529,6 +529,103 @@ function getStayNatGroupByListing(yearMonth, listingIds) {
     GROUP BY listing_id, nationality ORDER BY listing_id, cnt DESC`).all(yearMonth, ...f.params);
 }
 
+
+// Parse and import stay (payout) CSV — supports regular (21-col) and tax (17-col)
+function importStayCSV(content, yearMonth, userId, filename) {
+  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) throw new Error('年月をYYYY-MM形式で指定してください');
+  if (content.charCodeAt(0) === 0xFEFF) content = content.substring(1);
+  const lines = content.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) throw new Error('データ行がありません');
+
+  const header = lines[0];
+  const isTax = header.includes('管理費') && !header.includes('入金予定日');
+
+  const allListings = listListings();
+  const lMap = {};
+  for (const l of allListings) {
+    if (l.nickname) lMap[l.nickname.trim()] = l.listing_id;
+    if (l.title) lMap[l.title.trim()] = l.listing_id;
+  }
+  const SHORT = {'空(D)':'46054881','咲(C)':'46054250','風(B-1)':'46041421','彩(B-2)':'46040642','夢(E-1)':'46094651','月(E-2)':'46095229','星(A-2)':'45999954','音(A-1)':'48020055','AA Villa':'aa_villa_karuizawa'};
+  const KEYWORD = {'蓮沼':'25759905','一宮海岸':'1580859822145228367'};
+
+  function findLid(name) {
+    if (!name) return null;
+    name = name.trim();
+    if (lMap[name]) return lMap[name];
+    for (const [k,v] of Object.entries(SHORT)) { if (name.includes(k)) return v; }
+    for (const [k,v] of Object.entries(lMap)) { if (k.length > 5 && name.includes(k)) return v; }
+    for (const [k,v] of Object.entries(lMap)) { if (k.length > 5 && k.includes(name)) return v; }
+    for (const [k,v] of Object.entries(KEYWORD)) { if (name.includes(k)) return v; }
+    return null;
+  }
+  function pDate(d) {
+    const m = (d||'').trim().match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    return m ? `${m[3]}-${m[1]}-${m[2]}` : '';
+  }
+
+  let imported = 0, skipped = 0, adjCount = 0;
+  const unmatchedSet = new Set();
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 10) continue;
+
+    let kind, date, confCode, startDate, nights, guest, listingName, detail, amount, serviceFee, cleaningFee, totalRevenue;
+
+    if (isTax) {
+      kind = (cols[1]||'').trim();
+      if (kind === 'Pass Through Tot' || !kind) continue;
+      date = pDate(cols[0]); confCode = (cols[2]||'').trim();
+      startDate = pDate(cols[3]); nights = parseInt(cols[4]) || 0;
+      guest = (cols[5]||'').trim(); listingName = (cols[6]||'').trim();
+      detail = (cols[7]||'').trim();
+      amount = parseFloat((cols[10]||'').replace(/,/g,'')) || 0;
+      serviceFee = parseFloat((cols[12]||'').replace(/,/g,'')) || 0;
+      cleaningFee = parseFloat((cols[13]||'').replace(/,/g,'')) || 0;
+      totalRevenue = parseFloat((cols[14]||'').replace(/,/g,'')) || 0;
+    } else {
+      kind = (cols[2]||'').trim();
+      if (kind === 'Payout' || !kind) continue;
+      date = pDate(cols[0]); confCode = (cols[3]||'').trim();
+      startDate = pDate(cols[5]); nights = parseInt(cols[7]) || 0;
+      guest = (cols[8]||'').trim(); listingName = (cols[9]||'').trim();
+      detail = (cols[10]||'').trim();
+      amount = parseFloat((cols[13]||'').replace(/,/g,'')) || 0;
+      serviceFee = parseFloat((cols[15]||'').replace(/,/g,'')) || 0;
+      cleaningFee = parseFloat((cols[17]||'').replace(/,/g,'')) || 0;
+      totalRevenue = parseFloat((cols[18]||'').replace(/,/g,'')) || 0;
+    }
+
+    const lid = findLid(listingName);
+    if (!lid) { unmatchedSet.add(listingName); skipped++; continue; }
+
+    const isAdj = (kind === '調整金' || kind === '解決の受取金');
+    const code = isAdj ? `ADJ-${confCode}-${date}` : confCode;
+    const guestName = isAdj ? `${guest} (${kind})` : guest;
+    const netRev = isAdj ? amount : (amount - cleaningFee);
+    const mgmtFee = Math.round(netRev * 0.20);
+    const ownerRev = netRev - mgmtFee;
+
+    db.prepare(`INSERT OR REPLACE INTO stay_records
+      (confirmation_code, listing_id, year_month, payout_date, start_date, nights,
+       guest_name, nationality, adults, children, infants, total_guests,
+       amount, service_fee, cleaning_fee, total_revenue,
+       cleaning_outsource, net_revenue, mgmt_fee, owner_revenue)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(code, lid, yearMonth, date, startDate, isAdj ? 0 : nights,
+      guestName, 'Unknown', 0, 0, 0, 0,
+      amount, isAdj ? 0 : serviceFee, isAdj ? 0 : cleaningFee, totalRevenue,
+      0, netRev, mgmtFee, ownerRev);
+
+    imported++;
+    if (isAdj) adjCount++;
+  }
+
+  logUpload(filename || 'stay_upload.csv', yearMonth, imported, userId);
+  return { imported, adjustments: adjCount, skipped, yearMonth, format: isTax ? '税フォーマット(17列)' : '通常フォーマット(21列)', unmatched: [...unmatchedSet] };
+}
+
 module.exports = {
   getDb, authenticate, getUser,
   getPasskeysByUser, getPasskeyByCred, savePasskey, updatePasskeyCounter, deletePasskey,
@@ -537,7 +634,7 @@ module.exports = {
   upsertMonthlyData, getMonthlyData, getMonthlyDataRange, getAvailableMonths, getMonthlyDataByMonth, getPortfolioSummary, getAreaSummary,
   getAiReport, saveAiReport, clearAiReports,
   getPrompt, listPrompts, updatePrompt,
-  logUpload, listUploads, importCSV,
+  logUpload, listUploads, importCSV, importStayCSV,
   SYSTEM_PROMPT, DEFAULT_PROMPTS,
   importStayRecords, getStayRecordsByListing, getStayRecordsByMonth,
   getStaySummaryByListing, getStayNationalitySummary, getStayNatGroupByListing, getStayMonths, getStayOverall

@@ -425,16 +425,47 @@ async function loadAiReport(type){
 async function loadAdminCsv(){
   const el=document.getElementById('page-admin-csv');
   const uploads=await api('/api/admin/uploads')||[];
+  const now=new Date();const defYM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   el.innerHTML=`
     <h2 class="text-lg font-bold mb-4">CSVアップロード</h2>
-    <div class="card">
-      <p class="text-sm text-gray-500 mb-3">Airbnb管理画面からダウンロードした月次CSVを一括アップロード。年月は1行目から自動検出されます。</p>
-      <input type="file" id="csvFiles" accept=".csv" multiple class="inp mb-3">
-      <button onclick="uploadCsv()" class="btn btn-p w-full"><i class="fas fa-cloud-upload-alt mr-2"></i>アップロード</button>
-      <div id="csvResult" class="mt-3"></div>
+    <div class="flex gap-2 mb-4">
+      <button id="csvTab1" onclick="switchCsvTab(1)" class="flex-1 py-2 rounded-xl text-sm font-bold bg-gray-900 text-white">予約実績CSV</button>
+      <button id="csvTab2" onclick="switchCsvTab(2)" class="flex-1 py-2 rounded-xl text-sm font-bold bg-gray-100 text-gray-600">宿泊実績CSV</button>
+    </div>
+    <div id="csvPane1">
+      <div class="card">
+        <p class="text-sm text-gray-500 mb-3">Airbnb管理画面からダウンロードした<b>月次パフォーマンスCSV</b>を一括アップロード。年月は1行目から自動検出されます。</p>
+        <input type="file" id="csvFiles" accept=".csv" multiple class="inp mb-3">
+        <button onclick="uploadCsv()" class="btn btn-p w-full"><i class="fas fa-cloud-upload-alt mr-2"></i>アップロード</button>
+        <div id="csvResult" class="mt-3"></div>
+      </div>
+    </div>
+    <div id="csvPane2" class="hidden">
+      <div class="card">
+        <p class="text-sm text-gray-500 mb-3">Airbnbの<b>支払い明細CSV</b>（payout CSV）をアップロード。21列・17列の両フォーマットに対応。調整金・解決の受取金も自動取り込みされます。</p>
+        <div class="mb-3">
+          <label class="block text-xs font-bold text-gray-700 mb-1">対象年月 <span class="text-red-500">*</span></label>
+          <input type="month" id="stayYM" value="${defYM}" class="inp">
+        </div>
+        <input type="file" id="stayCsvFiles" accept=".csv" multiple class="inp mb-3">
+        <button onclick="uploadStayCsv()" class="btn btn-p w-full"><i class="fas fa-cloud-upload-alt mr-2"></i>宿泊実績アップロード</button>
+        <div id="stayCsvResult" class="mt-3"></div>
+      </div>
+      <div class="card mt-4 text-xs text-gray-400">
+        <p class="font-bold text-gray-600 mb-1">対応フォーマット</p>
+        <p>• <b>通常フォーマット（21列）</b>: 日付,入金予定日,種別,確認コード,…（個別payout CSV）</p>
+        <p>• <b>税フォーマット（17列）</b>: 日付,種別,確認コード,…管理費,…（一括税CSV）</p>
+        <p class="mt-1">※ 重複する確認コードは自動で上書きされます</p>
+      </div>
     </div>
     <h3 class="text-sm font-bold text-gray-700 mb-2 mt-6">アップロード履歴</h3>
     ${uploads.length?'<div class="card p-0 overflow-hidden"><table class="w-full text-xs"><thead><tr class="bg-gray-900 text-white"><th class="px-3 py-2.5 text-left">ファイル</th><th class="px-3 py-2.5">年月</th><th class="px-3 py-2.5">件数</th><th class="px-3 py-2.5">実行者</th><th class="px-3 py-2.5">日時</th></tr></thead><tbody>'+uploads.map(u=>`<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="px-3 py-2.5">${u.filename}</td><td class="px-3 py-2.5 text-center">${u.year_month}</td><td class="px-3 py-2.5 text-right font-medium">${u.rows_imported}</td><td class="px-3 py-2.5">${u.uploader||'-'}</td><td class="px-3 py-2.5 text-gray-500">${(u.uploaded_at||'').replace('T',' ').substring(0,16)}</td></tr>`).join('')+'</tbody></table></div>':'<p class="text-gray-400 text-sm">まだアップロードされていません</p>'}`;
+}
+function switchCsvTab(n){
+  document.getElementById('csvTab1').className='flex-1 py-2 rounded-xl text-sm font-bold '+(n===1?'bg-gray-900 text-white':'bg-gray-100 text-gray-600');
+  document.getElementById('csvTab2').className='flex-1 py-2 rounded-xl text-sm font-bold '+(n===2?'bg-gray-900 text-white':'bg-gray-100 text-gray-600');
+  document.getElementById('csvPane1').classList.toggle('hidden',n!==1);
+  document.getElementById('csvPane2').classList.toggle('hidden',n!==2);
 }
 
 async function uploadCsv(){
@@ -450,6 +481,26 @@ async function uploadCsv(){
       :`<div class="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-2">❌ ${x.file}: ${x.error}</div>`
     ).join('');
     toast('アップロード完了');
+    setTimeout(()=>loadAdminCsv(),1500);
+  }else toast(r?.error||'エラー');
+}
+
+async function uploadStayCsv(){
+  const ym=document.getElementById('stayYM').value;
+  if(!ym){toast('年月を選択してください');return}
+  const files=document.getElementById('stayCsvFiles').files;
+  if(!files.length){toast('ファイルを選択してください');return}
+  const fd=new FormData();
+  fd.append('yearMonth',ym);
+  for(const f of files)fd.append('files',f);
+  document.getElementById('stayCsvResult').innerHTML='<div class="text-center py-3"><div class="w-6 h-6 border-2 border-gray-200 border-t-pink-500 rounded-full spin mx-auto"></div></div>';
+  const r=await fetch(B+'/api/admin/stay-csv',{method:'POST',body:fd}).then(x=>x.json());
+  if(r?.results){
+    document.getElementById('stayCsvResult').innerHTML=r.results.map(x=>
+      x.success?`<div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 mb-2">✅ ${x.file}: ${x.imported}件取込 (調整金${x.adjustments||0}件, ${x.format||''})${x.skipped?'<br><span class=\"text-yellow-700\">⚠️ '+x.skipped+'件スキップ（リスティング未登録）</span>':''}${x.unmatched?.length?'<br><span class=\"text-xs text-gray-500\">未マッチ: '+x.unmatched.join(', ')+'</span>':''}</div>`
+      :`<div class="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-2">❌ ${x.file}: ${x.error}</div>`
+    ).join('');
+    toast('宿泊実績アップロード完了');
     setTimeout(()=>loadAdminCsv(),1500);
   }else toast(r?.error||'エラー');
 }
