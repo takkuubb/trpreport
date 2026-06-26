@@ -631,6 +631,18 @@ function importStayCSV(content, yearMonth, userId, filename) {
   return { imported, adjustments: adjCount, skipped, yearMonth, format: isTax ? '税フォーマット(17列)' : '通常フォーマット(21列)', unmatched: [...unmatchedSet] };
 }
 
+
+function getStayMonthlyByListing(listingId) {
+  return db.prepare(`SELECT year_month,
+    SUM(nights) as nights, SUM(total_guests) as guests,
+    SUM(amount) as amount, SUM(service_fee) as service_fee,
+    SUM(cleaning_fee) as cleaning_fee, SUM(total_revenue) as total_revenue,
+    SUM(cleaning_outsource) as cleaning_outsource, SUM(net_revenue) as net_revenue,
+    SUM(mgmt_fee) as mgmt_fee, SUM(owner_revenue) as owner_revenue
+    FROM stay_records WHERE listing_id=?
+    GROUP BY year_month ORDER BY year_month DESC`).all(listingId);
+}
+
 module.exports = {
   getDb, authenticate, getUser,
   getPasskeysByUser, getPasskeyByCred, savePasskey, updatePasskeyCounter, deletePasskey,
@@ -642,5 +654,5 @@ module.exports = {
   logUpload, listUploads, importCSV, importStayCSV,
   SYSTEM_PROMPT, DEFAULT_PROMPTS,
   importStayRecords, getStayRecordsByListing, getStayRecordsByMonth,
-  getStaySummaryByListing, getStayNationalitySummary, getStayNatGroupByListing, getStayMonths, getStayOverall
+  getStaySummaryByListing, getStayNationalitySummary, getStayNatGroupByListing, getStayMonths, getStayOverall, getStayMonthlyByListing
 };

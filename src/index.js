@@ -575,6 +575,13 @@ app.get(`${B}/api/stay/nat-by-listing/:yearMonth`, auth, (req, res) => {
 });
 
 
+
+// Monthly trend for a single listing
+app.get(`${B}/api/stay/monthly/:listingId`, auth, (req, res) => {
+  const data = db.getStayMonthlyByListing(req.params.listingId);
+  res.json(data);
+});
+
 // Stay AI report per listing
 app.get(`${B}/api/stay/ai/:listingId/:yearMonth`, auth, async (req, res) => {
   const { listingId, yearMonth } = req.params;

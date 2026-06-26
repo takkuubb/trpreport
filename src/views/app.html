@@ -1060,9 +1060,10 @@ async function showStayDetail(lid,noHash){
   }
   const ct=document.getElementById('stayContent');
   ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
-  const [records,natData]=await Promise.all([
+  const [records,natData,monthlyTrend]=await Promise.all([
     api(`/api/stay/records/${stayMonth}/${lid}`),
-    api(`/api/stay/nationality/${stayMonth}?listing_id=${lid}`)
+    api(`/api/stay/nationality/${stayMonth}?listing_id=${lid}`),
+    api(`/api/stay/monthly/${lid}`)
   ]);
   const listing=stayData.summary?.find(s=>s.listing_id===lid)||{};
   let h=`<button onclick="_currentStayDetailLid=null;window._skipHash=true;location.hash='admin-stay';renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
@@ -1102,6 +1103,35 @@ async function showStayDetail(lid,noHash){
     </div>
     <div id="stayAiContent" class="text-sm text-gray-600 leading-relaxed"><div class="flex items-center gap-2 text-gray-400"><div class="animate-spin w-4 h-4 border-2 border-pink-200 border-t-pink-500 rounded-full"></div><span class="text-xs">AI分析を生成中...</span></div></div>
   </div>`;
+
+  // Monthly trend table
+  if(monthlyTrend&&monthlyTrend.length){
+    h+=`<div class="card overflow-x-auto"><h4 class="font-bold text-xs mb-3"><i class="fas fa-chart-line mr-1" style="color:var(--pri)"></i>月別集計実績</h4>
+    <table class="w-full text-xs" style="min-width:${Math.max(600,monthlyTrend.length*100)}px">
+    <thead class="bg-gray-50"><tr><th class="px-2 py-2 text-left sticky left-0 bg-gray-50 z-10" style="min-width:100px">項目</th>`;
+    monthlyTrend.forEach(m=>{ h+=`<th class="px-2 py-2 text-right" style="min-width:90px">${m.year_month}</th>`; });
+    h+=`</tr></thead><tbody>`;
+    const rows=[
+      {label:'泊数',key:'nights',fmt:v=>v.toLocaleString()},
+      {label:'ゲスト数',key:'guests',fmt:v=>v.toLocaleString()},
+      {label:'金額',key:'amount',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'手数料',key:'service_fee',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'清掃料',key:'cleaning_fee',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'総売上',key:'total_revenue',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'清掃代行',key:'cleaning_outsource',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'純売上',key:'net_revenue',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'運営手数料',key:'mgmt_fee',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+      {label:'オーナー収益',key:'owner_revenue',fmt:v=>'¥'+Math.round(v).toLocaleString()},
+    ];
+    rows.forEach((row,ri)=>{
+      const isBold=row.key==='net_revenue'||row.key==='owner_revenue';
+      h+=`<tr class="border-b border-gray-100${isBold?' font-semibold bg-pink-50/30':''}">
+        <td class="px-2 py-1.5 sticky left-0 bg-white z-10 whitespace-nowrap${isBold?' bg-pink-50/30':''}">${row.label}</td>`;
+      monthlyTrend.forEach(m=>{ h+=`<td class="px-2 py-1.5 text-right tabular-nums">${row.fmt(m[row.key]||0)}</td>`; });
+      h+=`</tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
 
   // Records table
   h+=`<div class="card overflow-x-auto"><h4 class="font-bold text-xs mb-3">明細一覧</h4>
