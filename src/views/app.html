@@ -1145,7 +1145,7 @@ async function showStayDetail(lid,noHash){
   <th class="px-2 py-2 text-right">金額</th><th class="px-2 py-2 text-right">手数料</th><th class="px-2 py-2 text-right">清掃料</th>
   <th class="px-2 py-2 text-right">総売上</th><th class="px-2 py-2 text-right">純売上</th>
   <th class="px-2 py-2 text-right">運営手数料</th><th class="px-2 py-2 text-right">オーナー収益</th><th class="px-2 py-2 text-left">確認コード</th></tr></thead><tbody>`;
-  let totals={amount:0,svc:0,clean:0,rev:0,co:0,net:0,mgmt:0,own:0};
+  let totals={amount:0,svc:0,clean:0,rev:0,net:0,mgmt:0,own:0};
   for(const r of records){
     totals.amount+=r.amount;totals.svc+=r.service_fee;totals.clean+=r.cleaning_fee;
     totals.rev+=r.total_revenue;totals.net+=r.net_revenue;
@@ -1170,7 +1170,6 @@ async function showStayDetail(lid,noHash){
     <td class="px-2 py-2 text-right">${fmtMoney(totals.svc)}</td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.clean)}</td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.rev)}</td>
-    <td class="px-2 py-2 text-right">${fmtMoney(totals.co)}</td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.net)}</td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.mgmt)}</td>
     <td class="px-2 py-2 text-right" style="color:var(--green)">${fmtMoney(totals.own)}</td>
