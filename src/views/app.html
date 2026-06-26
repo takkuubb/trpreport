@@ -1143,12 +1143,12 @@ async function showStayDetail(lid,noHash){
   <table class="w-full text-xs" style="min-width:900px"><thead class="bg-gray-50">
   <tr><th class="px-2 py-2 text-left">日付</th><th class="px-2 py-2 text-right">泊</th><th class="px-2 py-2 text-left">ゲスト</th>
   <th class="px-2 py-2 text-right">金額</th><th class="px-2 py-2 text-right">手数料</th><th class="px-2 py-2 text-right">清掃料</th>
-  <th class="px-2 py-2 text-right">総売上</th><th class="px-2 py-2 text-right">清掃代行</th><th class="px-2 py-2 text-right">純売上</th>
+  <th class="px-2 py-2 text-right">総売上</th><th class="px-2 py-2 text-right">純売上</th>
   <th class="px-2 py-2 text-right">運営手数料</th><th class="px-2 py-2 text-right">オーナー収益</th><th class="px-2 py-2 text-left">確認コード</th></tr></thead><tbody>`;
   let totals={amount:0,svc:0,clean:0,rev:0,co:0,net:0,mgmt:0,own:0};
   for(const r of records){
     totals.amount+=r.amount;totals.svc+=r.service_fee;totals.clean+=r.cleaning_fee;
-    totals.rev+=r.total_revenue;totals.co+=r.cleaning_outsource;totals.net+=r.net_revenue;
+    totals.rev+=r.total_revenue;totals.net+=r.net_revenue;
     totals.mgmt+=r.mgmt_fee;totals.own+=r.owner_revenue;
     const gInfo=r.total_guests?` (${r.adults}A${r.children?'/'+r.children+'C':''}${r.infants?'/'+r.infants+'I':''})`:' ';
     h+=`<tr class="border-b border-gray-100 hover:bg-gray-50">
@@ -1159,7 +1159,6 @@ async function showStayDetail(lid,noHash){
       <td class="px-2 py-2 text-right">${fmtMoney(r.service_fee)}</td>
       <td class="px-2 py-2 text-right">${fmtMoney(r.cleaning_fee)}</td>
       <td class="px-2 py-2 text-right">${fmtMoney(r.total_revenue)}</td>
-      <td class="px-2 py-2 text-right">${fmtMoney(r.cleaning_outsource)}</td>
       <td class="px-2 py-2 text-right font-bold">${fmtMoney(r.net_revenue)}</td>
       <td class="px-2 py-2 text-right">${fmtMoney(r.mgmt_fee)}</td>
       <td class="px-2 py-2 text-right font-bold" style="color:var(--green)">${fmtMoney(r.owner_revenue)}</td>
