@@ -903,6 +903,15 @@ async function regPasskey(){
 // ===================== 宿泊実績 =====================
 let stayMonth='';
 let stayData={};
+let _currentStayDetailLid=null;
+function changeStayMonth(val){
+  stayMonth=val;
+  if(_currentStayDetailLid){
+    showStayDetail(_currentStayDetailLid,true);
+  }else{
+    renderStay();
+  }
+}
 async function loadStay(){
   const el=document.getElementById('page-admin-stay');
   el.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
@@ -910,20 +919,22 @@ async function loadStay(){
     const months=await api('/api/stay/months');
     if(!months.length){el.innerHTML='<div class="card text-center text-gray-500">宿泊実績データがありません</div>';return}
     if(!stayMonth)stayMonth=months[0];
-    // Month selector + content
+    // Month selector outside stayContent so detail view can preserve it
     el.innerHTML=`
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-bold">宿泊実績レポート</h2>
-      <select id="stayMonthSel" class="inp" style="width:auto;min-height:36px;padding:6px 12px" onchange="stayMonth=this.value;renderStay()">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <h2 class="text-lg font-bold whitespace-nowrap">宿泊実績レポート</h2>
+      <select id="stayMonthSel" class="inp" style="width:auto;min-width:120px;min-height:36px;padding:6px 12px" onchange="changeStayMonth(this.value)">
         ${months.map(m=>`<option value="${m}" ${m===stayMonth?'selected':''}>${m}</option>`).join('')}
       </select>
     </div>
     <div id="stayContent"></div>`;
+    window._stayMonths = months;
     await renderStay();
   }catch(e){el.innerHTML=`<div class="card text-red-500">${e.message}</div>`}
 }
 
 async function renderStay(){
+  _currentStayDetailLid=null;
   const ct=document.getElementById('stayContent');
   ct.innerHTML='<div class="flex justify-center py-8"><div class="animate-spin w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full"></div></div>';
   const [overall,summary,nationality]=await Promise.all([
@@ -1042,6 +1053,7 @@ function renderNatChart(data){
 }
 
 async function showStayDetail(lid,noHash){
+  _currentStayDetailLid=lid;
   if(!noHash){
     window._skipHash=true;
     location.hash='admin-stay/'+lid;
@@ -1053,7 +1065,7 @@ async function showStayDetail(lid,noHash){
     api(`/api/stay/nationality/${stayMonth}?listing_id=${lid}`)
   ]);
   const listing=stayData.summary?.find(s=>s.listing_id===lid)||{};
-  let h=`<button onclick="window._skipHash=true;location.hash='admin-stay';renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
+  let h=`<button onclick="_currentStayDetailLid=null;window._skipHash=true;location.hash='admin-stay';renderStay()" class="btn btn-o btn-sm mb-3"><i class="fas fa-arrow-left mr-2"></i>一覧に戻る</button>`;
   h+=`<div class="card">
     <div class="flex items-center gap-3 mb-4">
       ${listing.image_url?`<img src="${listing.image_url}" class="w-16 h-16 rounded-xl object-cover">`:''}
