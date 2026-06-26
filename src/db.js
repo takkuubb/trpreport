@@ -607,6 +607,11 @@ function importStayCSV(content, yearMonth, userId, filename) {
     const mgmtFee = Math.round(netRev * 0.20);
     const ownerRev = netRev - mgmtFee;
 
+    // Preserve nationality/guest counts if already set
+    const existing = db.prepare('SELECT nationality, adults, children, infants, total_guests FROM stay_records WHERE confirmation_code=? AND listing_id=? AND payout_date=?').get(code, lid, date);
+    const nat = (existing && existing.nationality !== 'Unknown') ? existing.nationality : 'Unknown';
+    const eA = existing?.adults || 0, eC = existing?.children || 0, eI = existing?.infants || 0, eT = existing?.total_guests || 0;
+
     db.prepare(`INSERT OR REPLACE INTO stay_records
       (confirmation_code, listing_id, year_month, payout_date, start_date, nights,
        guest_name, nationality, adults, children, infants, total_guests,
@@ -614,7 +619,7 @@ function importStayCSV(content, yearMonth, userId, filename) {
        cleaning_outsource, net_revenue, mgmt_fee, owner_revenue)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(code, lid, yearMonth, date, startDate, isAdj ? 0 : nights,
-      guestName, 'Unknown', 0, 0, 0, 0,
+      guestName, nat, eA, eC, eI, eT,
       amount, isAdj ? 0 : serviceFee, isAdj ? 0 : cleaningFee, totalRevenue,
       0, netRev, mgmtFee, ownerRev);
 
