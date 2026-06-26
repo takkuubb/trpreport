@@ -46,7 +46,7 @@ app.post(`${B}/api/passkey/register-options`, auth, async (req, res) => {
     const u = req.session.user;
     const existing = db.getPasskeysByUser(u.id);
     const options = await generateRegistrationOptions({
-      rpName: 'Airbnb 分析レポート', rpID: RP_ID,
+      rpName: '東方旅泊 Airbnb 分析レポート', rpID: RP_ID,
       userID: new TextEncoder().encode(String(u.id)),
       userName: u.username, userDisplayName: u.display_name,
       excludeCredentials: existing.map(k => ({ id: k.id, type: 'public-key' })),
@@ -627,4 +627,4 @@ try {
   }
 } catch (e) { console.log('Initial seed skipped:', e.message); }
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Airbnb 分析レポート on http://0.0.0.0:${PORT}${B}/`));
+app.listen(PORT, '0.0.0.0', () => console.log(`東方旅泊 Airbnb 分析レポート on http://0.0.0.0:${PORT}${B}/`));
