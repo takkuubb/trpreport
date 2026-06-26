@@ -979,10 +979,12 @@ async function renderStay(){
         </div>
         <i class="fas fa-chevron-right text-gray-300"></i>
       </div>
-      <div class="grid grid-cols-3 gap-2 text-center text-xs">
+      <div class="grid grid-cols-5 gap-2 text-center text-xs">
         <div><div class="font-bold text-sm">${fmtMoney(s.total_amount)}</div><div class="text-gray-400">金額</div></div>
-        <div><div class="font-bold text-sm">${fmtMoney(s.total_net_revenue)}</div><div class="text-gray-400">純売上</div></div>
         <div><div class="font-bold text-sm">${fmtMoney(s.total_owner_revenue)}</div><div class="text-gray-400">オーナー収益</div></div>
+        <div><div class="font-bold text-sm">${s.booking_count>0?(s.total_guests/s.booking_count).toFixed(1):'0'}<span class="text-gray-400 ml-0.5">名</span></div><div class="text-gray-400">平均ゲスト</div></div>
+        <div><div class="font-bold text-sm">¥${s.total_nights>0?Math.round(s.total_amount/s.total_nights).toLocaleString():'0'}</div><div class="text-gray-400">平均泊単価</div></div>
+        <div><div class="font-bold text-sm">${s.booking_count>0?(s.total_nights/s.booking_count).toFixed(1):'0'}<span class="text-gray-400 ml-0.5">泊</span></div><div class="text-gray-400">平均泊数</div></div>
       </div>
     </div>`;
   }
@@ -1073,11 +1075,13 @@ async function showStayDetail(lid,noHash){
       <div><div class="font-bold text-base">${listing.nickname||listing.title||lid}</div>
       <div class="text-xs text-gray-400">${listing.area||''} · ${records.length}件 · ${listing.total_nights||0}泊</div></div>
     </div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_amount)}</div><div class="kpi-label">金額合計</div></div>
-      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_net_revenue)}</div><div class="kpi-label">純売上</div></div>
-      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_mgmt_fee)}</div><div class="kpi-label">運営手数料</div></div>
-      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_owner_revenue)}</div><div class="kpi-label">オーナー様収益</div></div>
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
+      <div class="kpi-card"><div class="kpi-val text-lg">${listing.booking_count||records.length}<span class="text-sm ml-0.5">件</span></div><div class="kpi-label">予約件数</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${listing.total_nights||0}<span class="text-sm ml-0.5">泊</span></div><div class="kpi-label">総泊数</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${listing.booking_count?(listing.total_nights/listing.booking_count).toFixed(1):'0'}<span class="text-sm ml-0.5">泊</span></div><div class="kpi-label">平均泊数</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${listing.total_guests||0}<span class="text-sm ml-0.5">名</span></div><div class="kpi-label">ゲスト合計</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">¥${listing.total_nights?Math.round(listing.total_amount/listing.total_nights).toLocaleString():'0'}</div><div class="kpi-label">平均宿泊単価</div></div>
+      <div class="kpi-card"><div class="kpi-val text-lg">${fmtMoney(listing.total_owner_revenue)}</div><div class="kpi-label">オーナー収益</div></div>
     </div>
   </div>`;
 
