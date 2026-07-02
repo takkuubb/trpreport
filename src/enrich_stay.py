@@ -128,12 +128,94 @@ def guess_nat(name):
     if re.search(r'\bKim\b|\bLee\b|\bPark\b|\bChoi\b|\bJung\b|\bKang\b|\bYoon\b|\bPyun\b', n, re.I) and not re.search(r'\b[A-Z][a-z]+\s+Lee\b', n): return "South Korea"
     return "Unknown"
 
+# --- AI-based nationality classification via gsk (LLM) ---
+JP2EN = {
+    "日本":"Japan","中国":"China","韓国":"South Korea","台湾":"Taiwan","香港":"Hong Kong",
+    "タイ":"Thailand","マレーシア":"Malaysia","シンガポール":"Singapore","ベトナム":"Vietnam",
+    "インド":"India","アメリカ":"USA","イギリス":"UK","ドイツ":"Germany","フランス":"France",
+    "オーストラリア":"Australia","フィリピン":"Philippines","インドネシア":"Indonesia",
+    "スペイン":"Spain","イタリア":"Italy","ロシア":"Russia","ミャンマー":"Myanmar",
+    "グアテマラ":"Guatemala","レバノン":"Lebanon","カナダ":"Canada","不明":"Unknown",
+    "ニュージーランド":"New Zealand","オランダ":"Netherlands","ブラジル":"Brazil",
+    "台湾":"Taiwan","トルコ":"Turkey","ウクライナ":"Ukraine","ポーランド":"Poland",
+    "スイス":"Switzerland","オーストリア":"Austria","ベルギー":"Belgium","スウェーデン":"Sweden",
+    "ノルウェー":"Norway","デンマーク":"Denmark","フィンランド":"Finland","アイルランド":"Ireland",
+    "メキシコ":"Mexico","イスラエル":"Israel","サウジアラビア":"Saudi Arabia","アラブ首長国連邦":"UAE",
+}
+
+def ai_classify_nationalities(names):
+    """gsk(LLM)で名前リストの国籍を一括推定。{name: EN_nationality} を返す。"""
+    if not names: return {}
+    import tempfile, subprocess
+    prompt = ("以下はAirbnbゲストの名前リストです。各名前について、名前の言語的特徴・姓名の由来から"
+              "最も可能性の高い国籍を1つ推定してください。\n"
+              "出力は必ず「名前<TAB>国籍」の形式で、1行に1件。国籍は日本語表記。"
+              "判定できない場合のみ「不明」。説明や見出しは不要。\n\n名前リスト:\n" + "\n".join(names))
+    try:
+        with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False, encoding='utf-8') as tf:
+            tf.write(prompt)
+            tmpf = tf.name
+        r = subprocess.run(['gsk','summarize',tmpf,'--question',
+                            'リストの各名前の国籍を推定して「名前<TAB>国籍」形式で出力'],
+                           capture_output=True, text=True, timeout=120)
+        out = r.stdout
+        # gsk returns JSON; extract data.result which contains the answer
+        ans = out
+        try:
+            start = out.find('{')
+            j = json.loads(out[start:])
+            ans = j.get('data', {}).get('result', out)
+        except Exception:
+            pass
+        # 'answer:' 以降を抽出（JSON内では \\t / \\n がリテラルの場合がある）
+        if 'answer:' in ans:
+            ans = ans.split('answer:', 1)[1]
+        # normalize escaped tab/newline
+        ans = ans.replace('\\t', '\t').replace('\\n', '\n')
+        m = {}
+        for line in ans.split('\n'):
+            line = line.strip().strip('"')
+            if not line or line.startswith('Source'):
+                continue
+            if '\t' in line:
+                nm, jp = line.split('\t', 1)
+            elif '　' in line:
+                nm, jp = line.rsplit('　', 1)
+            else:
+                continue
+            nm = nm.strip(); jp = jp.strip()
+            en = JP2EN.get(jp, 'Unknown')
+            if nm and en != 'Unknown':
+                m[nm] = en
+        return m
+    except Exception as e:
+        print(f"AI classify error: {e}", file=sys.stderr)
+        return {}
+
+# First pass: rule-based (fast)
+ai_needed = []
 for r in needs_nat:
     nat = guess_nat(r['guest_name'])
     if nat != "Unknown":
         results['nationality'].append({'confirmation_code': r['confirmation_code'], 'nationality': nat})
+    else:
+        ai_needed.append(r)
 
-print(f"Nationality estimated: {len(results['nationality'])}/{len(needs_nat)}", file=sys.stderr)
+rule_count = len(results['nationality'])
+
+# Second pass: AI for the rest
+if ai_needed:
+    uniq_names = sorted(set(r['guest_name'] for r in ai_needed if r['guest_name'] and r['guest_name'].strip()))
+    print(f"AI classifying {len(uniq_names)} unique names...", file=sys.stderr)
+    ai_map = ai_classify_nationalities(uniq_names)
+    for r in ai_needed:
+        # strip adjustment suffix for matching
+        base = re.sub(r'\s*\((調整金|解決の受取金)\)', '', r['guest_name']).strip()
+        nat = ai_map.get(r['guest_name']) or ai_map.get(base)
+        if nat and nat != "Unknown":
+            results['nationality'].append({'confirmation_code': r['confirmation_code'], 'nationality': nat})
+
+print(f"Nationality estimated: {len(results['nationality'])}/{len(needs_nat)} (rule:{rule_count}, ai:{len(results['nationality'])-rule_count})", file=sys.stderr)
 
 # Guest count fetch via Gmail
 if needs_guests:
