@@ -64,20 +64,21 @@ def parse_guests(text):
     if m: children = int(m.group(1))
     m = re.search(r'幼児\s*[:：]?\s*(\d+)', text)
     if m: infants = int(m.group(1))
+    # 英語: "9 adults", "2 children", "1 infant"（数字+名詞。数字のない "bringing children" は拾わない）
     if adults == 0:
-        m = re.search(r'(\d+)\s*adult', text, re.I)
+        m = re.search(r'(\d+)\s*adults?\b', text, re.I)
         if m: adults = int(m.group(1))
     if children == 0:
-        m = re.search(r'(\d+)\s*child', text, re.I)
+        m = re.search(r'(\d+)\s*(?:child|children)\b', text, re.I)
         if m: children = int(m.group(1))
     if infants == 0:
-        m = re.search(r'(\d+)\s*infant', text, re.I)
+        m = re.search(r'(\d+)\s*infants?\b', text, re.I)
         if m: infants = int(m.group(1))
     if adults == 0 and children == 0:
         m = re.search(r'ゲスト\s*[:：]?\s*(\d+)\s*人', text)
         if m: adults = int(m.group(1))
     if adults == 0 and children == 0:
-        m = re.search(r'(\d+)\s*guest', text, re.I)
+        m = re.search(r'(\d+)\s*guests?\b', text, re.I)
         if m: adults = int(m.group(1))
     return adults, children, infants, adults + children + infants
 
@@ -225,16 +226,23 @@ if needs_guests:
         for i, r in enumerate(needs_guests):
             code = r['confirmation_code']
             if code.startswith('ADJ-'): continue
-            msgs = gmail_search(token, f'"{code}" subject:reminder OR subject:リマインダー', 3)
+            # 優先順: 予約確定（Reservation confirmed / 予約確定）→ リマインダー → 全件
+            msgs = gmail_search(token, f'"{code}" (subject:"Reservation confirmed" OR subject:"予約確定" OR subject:reminder OR subject:リマインダー)', 5)
             if not msgs:
-                msgs = gmail_search(token, f'"{code}"', 3)
+                msgs = gmail_search(token, f'"{code}"', 5)
+            found_guest = False
             if msgs:
-                msg = gmail_get(token, msgs[0]['id'])
-                if msg:
+                # 複数メールを順に見て、ゲスト人数が取れるまで試す
+                for mref in msgs:
+                    msg = gmail_get(token, mref['id'])
+                    if not msg:
+                        continue
                     text = decode_body(msg)
                     a, c, inf, t = parse_guests(text)
                     if t > 0:
                         results['guests'].append({'confirmation_code': code, 'adults': a, 'children': c, 'infants': inf, 'total_guests': t})
+                        found_guest = True
+                        break
             if (i+1) % 20 == 0:
                 print(f"  {i+1}/{len(needs_guests)} processed, found {len(results['guests'])}", file=sys.stderr)
                 time.sleep(0.3)

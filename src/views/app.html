@@ -1093,12 +1093,17 @@ async function showStayDetail(lid,noHash){
     const guestTotal=natData.reduce((a,c)=>a+c.guests,0);
     h+=`<div class="card"><h3 class="font-bold text-sm mb-3"><i class="fas fa-globe mr-1" style="color:var(--pri)"></i>国籍構成 <span class="text-gray-400 font-normal">${natTotal}件・${guestTotal}名</span></h3>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div style="max-width:220px;margin:0 auto"><canvas id="detailNatDonut" height="220"></canvas></div>
       <div>
-        <div class="mb-3"><canvas id="detailNatBar" height="${Math.max(120,natData.length*28)}"></canvas></div>
-        <div class="space-y-1.5 text-xs" id="detailNatList"></div>
+        <div class="text-xs text-gray-500 text-center mb-1">国籍別件数</div>
+        <div style="max-width:200px;margin:0 auto"><canvas id="detailNatDonut" height="200"></canvas></div>
       </div>
-    </div></div>`;
+      <div>
+        <div class="text-xs text-gray-500 text-center mb-1">大人・子供・幼児の割合</div>
+        <div style="max-width:200px;margin:0 auto"><canvas id="detailNatBar" height="200"></canvas></div>
+      </div>
+    </div>
+    <div class="space-y-1.5 text-xs mt-4 pt-3 border-t border-gray-100" id="detailNatList"></div>
+    </div>`;
   }
 
   // AI Analysis section
@@ -1140,8 +1145,9 @@ async function showStayDetail(lid,noHash){
 
   // Records table
   h+=`<div class="card overflow-x-auto"><h4 class="font-bold text-xs mb-3">明細一覧</h4>
-  <table class="w-full text-xs" style="min-width:900px"><thead class="bg-gray-50">
+  <table class="w-full text-xs" style="min-width:980px"><thead class="bg-gray-50">
   <tr><th class="px-2 py-2 text-left">日付</th><th class="px-2 py-2 text-right">泊</th><th class="px-2 py-2 text-left">ゲスト</th>
+  <th class="px-2 py-2 text-right">泊単価</th>
   <th class="px-2 py-2 text-right">金額</th><th class="px-2 py-2 text-right">手数料</th><th class="px-2 py-2 text-right">清掃料</th>
   <th class="px-2 py-2 text-right">総売上</th><th class="px-2 py-2 text-right">純売上</th>
   <th class="px-2 py-2 text-right">運営手数料</th><th class="px-2 py-2 text-right">オーナー収益</th><th class="px-2 py-2 text-left">確認コード</th></tr></thead><tbody>`;
@@ -1151,11 +1157,16 @@ async function showStayDetail(lid,noHash){
     totals.rev+=r.total_revenue;totals.net+=r.net_revenue;
     totals.mgmt+=r.mgmt_fee;totals.own+=r.owner_revenue;
     const gInfo=r.total_guests?` (${r.adults}A${r.children?'/'+r.children+'C':''}${r.infants?'/'+r.infants+'I':''})`:' ';
-    h+=`<tr class="border-b border-gray-100 hover:bg-gray-50">
+    const isAdj=r.confirmation_code&&r.confirmation_code.startsWith('ADJ-');
+    // 調整金が本体予約に合算されている場合の表示
+    const adjNote=(!isAdj&&r.adj_amount)?`<span class="text-amber-600" title="調整金合算">＋調整${fmtMoney(r.adj_amount)}</span>`:'';
+    const nrCell=isAdj?'<span class="text-gray-300">—</span>':`¥${Number(r.nightly_rate||0).toLocaleString()}`;
+    h+=`<tr class="border-b border-gray-100 hover:bg-gray-50${isAdj?' bg-amber-50/40':''}">
       <td class="px-2 py-2 whitespace-nowrap">${r.start_date}</td>
       <td class="px-2 py-2 text-right">${r.nights}</td>
       <td class="px-2 py-2"><div class="truncate max-w-[120px]" title="${r.guest_name}">${r.guest_name}</div><div class="text-gray-400">${r.nationality}${gInfo}</div></td>
-      <td class="px-2 py-2 text-right">${fmtMoney(r.amount)}</td>
+      <td class="px-2 py-2 text-right">${nrCell}</td>
+      <td class="px-2 py-2 text-right">${fmtMoney(r.amount)}${adjNote?'<br>'+adjNote:''}</td>
       <td class="px-2 py-2 text-right">${fmtMoney(r.service_fee)}</td>
       <td class="px-2 py-2 text-right">${fmtMoney(r.cleaning_fee)}</td>
       <td class="px-2 py-2 text-right">${fmtMoney(r.total_revenue)}</td>
@@ -1166,6 +1177,7 @@ async function showStayDetail(lid,noHash){
     </tr>`;
   }
   h+=`<tr class="bg-gray-50 font-bold"><td class="px-2 py-2" colspan="3">合計 (${records.length}件)</td>
+    <td class="px-2 py-2"></td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.amount)}</td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.svc)}</td>
     <td class="px-2 py-2 text-right">${fmtMoney(totals.clean)}</td>
@@ -1184,13 +1196,13 @@ async function showStayDetail(lid,noHash){
     // Donut
     const donutEl=document.getElementById('detailNatDonut');
     if(donutEl) new Chart(donutEl,{type:'doughnut',data:{labels:natData.map(d=>d.nationality),datasets:[{data:natData.map(d=>d.cnt),backgroundColor:colors.slice(0,natData.length),borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw}件 (${(ctx.raw/natTotal*100).toFixed(1)}%)`}}}}});
-    // Horizontal bar (guest count by nationality)
+    // Guest composition (大人・子供・幼児の合計割合、国籍で分けない)
     const barEl=document.getElementById('detailNatBar');
-    if(barEl) new Chart(barEl,{type:'bar',data:{labels:natData.map(d=>d.nationality),datasets:[
-      {label:'大人',data:natData.map(d=>d.adults),backgroundColor:'#FF385C'},
-      {label:'子供',data:natData.map(d=>d.children),backgroundColor:'#FFB400'},
-      {label:'幼児',data:natData.map(d=>d.infants),backgroundColor:'#61C0BF'}
-    ]},options:{indexAxis:'y',responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{display:false},ticks:{font:{size:10}}}}}});
+    const sumA=natData.reduce((a,d)=>a+(d.adults||0),0);
+    const sumC=natData.reduce((a,d)=>a+(d.children||0),0);
+    const sumI=natData.reduce((a,d)=>a+(d.infants||0),0);
+    const sumG=sumA+sumC+sumI;
+    if(barEl) new Chart(barEl,{type:'doughnut',data:{labels:['大人','子供','幼児'],datasets:[{data:[sumA,sumC,sumI],backgroundColor:['#FF385C','#FFB400','#61C0BF'],borderWidth:1}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw}名 (${sumG>0?(ctx.raw/sumG*100).toFixed(1):0}%)`}}}}});
     // Legend list
     const listEl=document.getElementById('detailNatList');
     if(listEl) listEl.innerHTML=natData.map((d,i)=>{

@@ -474,7 +474,31 @@ function listingFilter(listingIds, prefix='') {
 }
 
 function getStayRecordsByListing(listingId, yearMonth) {
-  return db.prepare('SELECT * FROM stay_records WHERE listing_id=? AND year_month=? ORDER BY start_date').all(listingId, yearMonth);
+  const rows = db.prepare('SELECT * FROM stay_records WHERE listing_id=? AND year_month=? ORDER BY start_date').all(listingId, yearMonth);
+  // 調整金/解決の受取金(ADJ-<code>-<date>)の金額を、同じ確認コードの本体予約に合算し、
+  // 合算後の金額から宿泊単価を算出する。
+  const baseByCode = {};
+  for (const r of rows) {
+    if (!r.confirmation_code.startsWith('ADJ-')) baseByCode[r.confirmation_code] = r;
+    r.adj_amount = 0; // 合算された調整金
+  }
+  for (const r of rows) {
+    const m = r.confirmation_code.match(/^ADJ-([A-Z0-9]+)-/);
+    if (m && baseByCode[m[1]]) {
+      baseByCode[m[1]].adj_amount = (baseByCode[m[1]].adj_amount || 0) + r.amount;
+    }
+  }
+  // 各行に合算後金額と宿泊単価を付与
+  for (const r of rows) {
+    if (r.confirmation_code.startsWith('ADJ-')) {
+      r.merged_amount = r.amount;
+      r.nightly_rate = 0; // 調整金単体は単価なし
+    } else {
+      r.merged_amount = r.amount + (r.adj_amount || 0);
+      r.nightly_rate = r.nights > 0 ? Math.round(r.merged_amount / r.nights) : 0;
+    }
+  }
+  return rows;
 }
 function getStayRecordsByMonth(yearMonth) {
   return db.prepare(`SELECT sr.*, l.nickname, l.title, l.area, l.image_url FROM stay_records sr
